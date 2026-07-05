@@ -268,6 +268,67 @@ export class DocEditor {
     return this.name.replace(/\.pdf$/i, '') || 'document';
   }
 
+  /** Approximate current document size (sum of loaded source bytes). */
+  originalSize(): number {
+    let total = 0;
+    for (const source of this.sources.values()) total += source.bytes.length;
+    return total;
+  }
+
+  /**
+   * Compress by re-rendering each page to a JPEG at the given DPI/quality and
+   * rebuilding the PDF from those images. Effective for scanned/image-heavy
+   * PDFs; note it flattens pages to images (text becomes non-selectable).
+   */
+  async compress(
+    dpi: number,
+    quality: number,
+    onProgress?: (r: { page: number; total: number }) => void,
+  ): Promise<Uint8Array> {
+    const { renderToCanvas } = await import('../render/pdfjs');
+    const { PDFDocument } = await import('pdf-lib');
+    const out = await PDFDocument.create();
+    const pages = this.pages.get();
+    const scale = dpi / 72;
+
+    for (let i = 0; i < pages.length; i++) {
+      const ref = pages[i];
+      const page = await this.renderPage(ref);
+      let widthPts: number;
+      let heightPts: number;
+      let canvas: HTMLCanvasElement;
+      if (page) {
+        const vp1 = page.getViewport({ scale: 1 });
+        widthPts = vp1.width;
+        heightPts = vp1.height;
+        canvas = await renderToCanvas(page, scale, ref.rotation);
+      } else {
+        const size = ref.blank ?? { width: 595, height: 842 };
+        widthPts = size.width;
+        heightPts = size.height;
+        canvas = document.createElement('canvas');
+        canvas.width = Math.floor(size.width * scale);
+        canvas.height = Math.floor(size.height * scale);
+      }
+      // Flatten onto white so the JPEG (no alpha) has no black transparency.
+      const withBg = document.createElement('canvas');
+      withBg.width = canvas.width;
+      withBg.height = canvas.height;
+      const ctx = withBg.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, withBg.width, withBg.height);
+        ctx.drawImage(canvas, 0, 0);
+      }
+      const jpeg = await canvasToJpegBytes(withBg, quality);
+      const img = await out.embedJpg(jpeg);
+      const p = out.addPage([widthPts, heightPts]);
+      p.drawImage(img, { x: 0, y: 0, width: widthPts, height: heightPts });
+      onProgress?.({ page: i + 1, total: pages.length });
+    }
+    return out.save();
+  }
+
   private sourceBytesMap(): Map<string, SourceBytes> {
     const bytes = new Map<string, SourceBytes>();
     for (const [id, source] of this.sources) bytes.set(id, source.bytes);
@@ -338,4 +399,14 @@ export class DocEditor {
     }
     return parts.join('\n\n');
   }
+}
+
+function canvasToJpegBytes(canvas: HTMLCanvasElement, quality: number): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      async (b) => (b ? resolve(new Uint8Array(await b.arrayBuffer())) : reject(new Error('toBlob failed'))),
+      'image/jpeg',
+      quality,
+    );
+  });
 }

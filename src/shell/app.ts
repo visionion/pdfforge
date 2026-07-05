@@ -4,6 +4,7 @@ import { createToolStrip } from './toolstrip';
 import { openFormPanel } from './formPanel';
 import { openConvertPanel } from './convertPanel';
 import { openOcrPanel } from './ocrPanel';
+import { openCompressPanel } from './compressPanel';
 import { openSignatureDialog } from '../features/sign/signatureDialog';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
@@ -43,6 +44,7 @@ export function mountApp(root: HTMLElement): void {
       onSign: () => void handleSign(),
       onImages: () => openConvertPanel(state),
       onOcr: () => openOcrPanel(state),
+      onCompress: () => openCompressPanel(state),
     },
   });
 
