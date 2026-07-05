@@ -17,7 +17,14 @@ export type Tool =
   | 'text'
   | 'note'
   | 'image'
-  | 'link';
+  | 'link'
+  | 'sign';
+
+export interface PendingSignature {
+  readonly dataUrl: string;
+  readonly aspect: number;
+  readonly withDate: boolean;
+}
 
 /**
  * Shared application state. A single instance is created at bootstrap and passed
@@ -31,6 +38,7 @@ export class AppState {
   readonly editor = new DocEditor(this.commands);
   readonly activeTool = new Signal<Tool>('select');
   readonly toolColor = new Signal<string>('#e5393a');
+  readonly pendingSignature = new Signal<PendingSignature | null>(null);
 
   readonly minScale = 0.25;
   readonly maxScale = 4;

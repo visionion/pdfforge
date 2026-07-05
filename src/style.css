@@ -437,6 +437,45 @@ button.icon {
   margin-top: 18px;
 }
 
+/* ---------- Signature dialog ---------- */
+.sign-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.sign-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  min-height: 170px;
+}
+.sign-pad {
+  width: 100%;
+  height: 160px;
+  background: #fff;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.sign-type-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 26px;
+  font-family: 'Segoe Script', 'Snell Roundhand', 'Brush Script MT', cursive;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+}
+.sign-preview {
+  max-width: 100%;
+  max-height: 120px;
+  background: #fff;
+  border-radius: 6px;
+}
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed;

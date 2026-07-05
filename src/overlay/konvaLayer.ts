@@ -4,7 +4,7 @@ import type { Annotation } from './annotations';
 import { newAnnotationId, annotationsForPage } from './annotations';
 import { screenToPdf, pdfToScreen } from './coords';
 
-const DRAW_TOOLS: Tool[] = ['highlight', 'redact', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'image', 'link'];
+const DRAW_TOOLS: Tool[] = ['highlight', 'redact', 'ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note', 'image', 'link', 'sign'];
 
 /**
  * One Konva overlay per rendered page. Displays that page's annotations and,
@@ -236,6 +236,10 @@ export class PageOverlay {
       });
       return;
     }
+    if (tool === 'sign') {
+      this.placeSignature(pos);
+      return;
+    }
 
     this.start = pos;
     if (tool === 'ink') {
@@ -302,6 +306,44 @@ export class PageOverlay {
   private buildText(tool: 'text' | 'note', pos: { x: number; y: number }, text: string): Annotation {
     const p = screenToPdf(pos.x, pos.y, this.pageHeightPts, this.scale);
     return { id: newAnnotationId(), pageId: this.pageId, type: tool, color: this.state.toolColor.get(), x: p.x, y: p.y, text, fontSize: 14 };
+  }
+
+  private placeSignature(pos: { x: number; y: number }): void {
+    const pending = this.state.pendingSignature.get();
+    if (!pending) return;
+    const s = this.scale;
+    const widthPts = 160;
+    const heightPts = widthPts / pending.aspect;
+    const bottomLeft = screenToPdf(pos.x, pos.y + heightPts * s, this.pageHeightPts, s);
+    const anns: Annotation[] = [
+      {
+        id: newAnnotationId(),
+        pageId: this.pageId,
+        type: 'image',
+        color: '#000000',
+        x: bottomLeft.x,
+        y: bottomLeft.y,
+        width: widthPts,
+        height: heightPts,
+        dataUrl: pending.dataUrl,
+        format: 'png',
+      },
+    ];
+    if (pending.withDate) {
+      anns.push({
+        id: newAnnotationId(),
+        pageId: this.pageId,
+        type: 'text',
+        color: '#111111',
+        x: bottomLeft.x,
+        y: bottomLeft.y - 12,
+        text: new Date().toLocaleDateString(),
+        fontSize: 10,
+      });
+    }
+    this.state.editor.addAnnotations(anns, 'Signature');
+    this.state.pendingSignature.set(null);
+    this.state.activeTool.set('select');
   }
 
   private buildImage(pos: { x: number; y: number }, picked: PickedImage): Annotation {

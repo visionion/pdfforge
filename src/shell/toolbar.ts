@@ -5,6 +5,7 @@ export interface ToolbarCallbacks {
   onAddFile: () => void;
   onDownload: () => void;
   onForm: () => void;
+  onSign: () => void;
 }
 
 /** Top toolbar: open, add, download, page indicator, zoom, undo/redo, theme. */
@@ -19,6 +20,7 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
   const openBtn = button('Open', 'primary', cb.onOpen);
   const addBtn = button('Add PDF', 'ghost', cb.onAddFile);
   const formBtn = button('Form', 'ghost', cb.onForm);
+  const signBtn = button('Sign', 'ghost', cb.onSign);
   const downloadBtn = button('Download', 'primary', cb.onDownload);
 
   const pageInfo = document.createElement('span');
@@ -47,6 +49,7 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
     group(zoomOut, zoomLevel, zoomIn),
     group(undoBtn, redoBtn),
     formBtn,
+    signBtn,
     downloadBtn,
     themeBtn,
   );
@@ -56,7 +59,7 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
     const has = count > 0;
     pageInfo.textContent = has ? `Page ${state.currentPage.get()} / ${count}` : '';
     zoomLevel.textContent = `${Math.round(state.scale.get() * 100)}%`;
-    for (const el of [zoomOut, zoomIn, addBtn, downloadBtn, formBtn]) el.toggleAttribute('disabled', !has);
+    for (const el of [zoomOut, zoomIn, addBtn, downloadBtn, formBtn, signBtn]) el.toggleAttribute('disabled', !has);
   }
 
   function syncHistory(): void {

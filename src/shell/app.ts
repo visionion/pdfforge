@@ -2,6 +2,7 @@ import { AppState } from './appState';
 import { createToolbar } from './toolbar';
 import { createToolStrip } from './toolstrip';
 import { openFormPanel } from './formPanel';
+import { openSignatureDialog } from '../features/sign/signatureDialog';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
 import { installShortcuts } from './shortcuts';
@@ -35,7 +36,16 @@ export function mountApp(root: HTMLElement): void {
     onAddFile: requestAdd,
     onDownload: () => void handleDownload(),
     onForm: () => void openFormPanel(state),
+    onSign: () => void handleSign(),
   });
+
+  async function handleSign(): Promise<void> {
+    const sig = await openSignatureDialog();
+    if (!sig) return;
+    state.pendingSignature.set(sig);
+    state.activeTool.set('sign');
+    notify('Click on the page where you want your signature.');
+  }
 
   const toolstrip = createToolStrip(state);
 
