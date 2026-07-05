@@ -2,9 +2,11 @@ import type { AppState } from './appState';
 
 export interface ToolbarCallbacks {
   onOpen: () => void;
+  onAddFile: () => void;
+  onDownload: () => void;
 }
 
-/** Top toolbar: open, page indicator, zoom, undo/redo, theme. */
+/** Top toolbar: open, add, download, page indicator, zoom, undo/redo, theme. */
 export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElement {
   const root = document.createElement('header');
   root.className = 'toolbar';
@@ -14,6 +16,8 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
   brand.innerHTML = `<span class="brand-mark">PDF</span><span class="brand-name">forge</span>`;
 
   const openBtn = button('Open', 'primary', cb.onOpen);
+  const addBtn = button('Add PDF', 'ghost', cb.onAddFile);
+  const downloadBtn = button('Download', 'primary', cb.onDownload);
 
   const pageInfo = document.createElement('span');
   pageInfo.className = 'page-info';
@@ -35,19 +39,21 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
   root.append(
     brand,
     openBtn,
+    addBtn,
     spacer,
     pageInfo,
     group(zoomOut, zoomLevel, zoomIn),
     group(undoBtn, redoBtn),
+    downloadBtn,
     themeBtn,
   );
 
   function syncDocControls(): void {
-    const doc = state.doc.get();
-    const has = doc !== null;
-    pageInfo.textContent = has ? `Page ${state.currentPage.get()} / ${doc!.numPages}` : '';
+    const count = state.editor.pages.get().length;
+    const has = count > 0;
+    pageInfo.textContent = has ? `Page ${state.currentPage.get()} / ${count}` : '';
     zoomLevel.textContent = `${Math.round(state.scale.get() * 100)}%`;
-    for (const el of [zoomOut, zoomIn]) el.toggleAttribute('disabled', !has);
+    for (const el of [zoomOut, zoomIn, addBtn, downloadBtn]) el.toggleAttribute('disabled', !has);
   }
 
   function syncHistory(): void {
@@ -55,7 +61,7 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
     redoBtn.toggleAttribute('disabled', !state.commands.canRedo());
   }
 
-  state.doc.subscribe(syncDocControls);
+  state.editor.pages.subscribe(syncDocControls);
   state.scale.subscribe(syncDocControls);
   state.currentPage.subscribe(syncDocControls);
   state.commands.subscribe(syncHistory);

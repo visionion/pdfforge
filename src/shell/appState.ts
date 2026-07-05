@@ -1,6 +1,6 @@
 import { Signal } from '../store/store';
 import { CommandStack } from '../store/commandStack';
-import type { OpenedDoc } from '../doc/documentModel';
+import { DocEditor } from '../doc/editor';
 
 export type Theme = 'light' | 'dark';
 
@@ -9,11 +9,11 @@ export type Theme = 'light' | 'dark';
  * to each shell component, which subscribes to the signals it cares about.
  */
 export class AppState {
-  readonly doc = new Signal<OpenedDoc | null>(null);
   readonly scale = new Signal<number>(1.25);
   readonly currentPage = new Signal<number>(1);
   readonly theme = new Signal<Theme>(readInitialTheme());
   readonly commands = new CommandStack();
+  readonly editor = new DocEditor(this.commands);
 
   readonly minScale = 0.25;
   readonly maxScale = 4;

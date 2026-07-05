@@ -177,6 +177,16 @@ button.icon {
 .thumb.active {
   border-color: var(--accent);
 }
+.thumb.drag-src {
+  opacity: 0.4;
+}
+.thumb.drag-over {
+  border-color: var(--accent-hover);
+  border-style: dashed;
+}
+.thumb canvas {
+  cursor: grab;
+}
 .thumb canvas {
   width: 100%;
   height: auto;
@@ -218,6 +228,33 @@ button.icon {
 }
 .page canvas {
   display: block;
+}
+.page-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.page:hover .page-controls {
+  opacity: 1;
+}
+.page-ctrl {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  background: rgba(15, 23, 42, 0.82);
+  color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px var(--shadow);
+}
+.page-ctrl:hover:not([disabled]) {
+  background: var(--accent);
 }
 
 .text-layer {

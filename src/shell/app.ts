@@ -4,22 +4,35 @@ import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
 import { installShortcuts } from './shortcuts';
 import { openPdf, PasswordRequiredError, InvalidPdfError } from '../doc/documentModel';
+import { downloadPdf } from '../export/download';
 
 /** Build and mount the whole app into the given root element. */
 export function mountApp(root: HTMLElement): void {
   const state = new AppState();
-  state.setTheme(state.theme.get()); // apply data-theme + persist
+  state.setTheme(state.theme.get());
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = 'application/pdf,.pdf';
   fileInput.style.display = 'none';
+  let mode: 'open' | 'add' = 'open';
 
-  const requestOpen = (): void => fileInput.click();
+  const requestOpen = (): void => {
+    mode = 'open';
+    fileInput.click();
+  };
+  const requestAdd = (): void => {
+    mode = 'add';
+    fileInput.click();
+  };
 
   const viewport = createViewport(state);
   const sidebar = createSidebar(state, viewport);
-  const toolbar = createToolbar(state, { onOpen: requestOpen });
+  const toolbar = createToolbar(state, {
+    onOpen: requestOpen,
+    onAddFile: requestAdd,
+    onDownload: () => void handleDownload(),
+  });
 
   const body = document.createElement('div');
   body.className = 'app-body';
@@ -30,14 +43,18 @@ export function mountApp(root: HTMLElement): void {
   shell.append(toolbar, body, fileInput);
   root.appendChild(shell);
 
-  async function handleFile(file: File): Promise<void> {
+  async function handleFile(file: File, how: 'open' | 'add'): Promise<void> {
     try {
       const buffer = await file.arrayBuffer();
       const doc = await openPdf(buffer, file.name);
-      state.commands.clear();
-      state.currentPage.set(1);
-      state.doc.set(doc);
-      document.title = `${file.name} — pdfforge`;
+      if (how === 'add' && state.editor.hasDoc()) {
+        state.editor.addFile(doc);
+      } else {
+        state.commands.clear();
+        state.currentPage.set(1);
+        state.editor.loadPrimary(doc);
+        document.title = `${file.name} — pdfforge`;
+      }
     } catch (err) {
       if (err instanceof PasswordRequiredError) {
         notify('This PDF is password protected. Unlocking is coming soon.');
@@ -50,13 +67,23 @@ export function mountApp(root: HTMLElement): void {
     }
   }
 
+  async function handleDownload(): Promise<void> {
+    if (!state.editor.hasDoc()) return;
+    try {
+      const bytes = await state.editor.export();
+      downloadPdf(bytes, state.editor.exportName());
+    } catch (err) {
+      notify('Export failed. Please try again.');
+      console.error(err);
+    }
+  }
+
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
-    if (file) void handleFile(file);
+    if (file) void handleFile(file, mode);
     fileInput.value = '';
   });
 
-  // Drag-and-drop open, anywhere on the window.
   window.addEventListener('dragover', (e) => {
     e.preventDefault();
     shell.classList.add('dragging');
@@ -68,10 +95,9 @@ export function mountApp(root: HTMLElement): void {
     e.preventDefault();
     shell.classList.remove('dragging');
     const file = e.dataTransfer?.files?.[0];
-    if (file) void handleFile(file);
+    if (file) void handleFile(file, state.editor.hasDoc() ? 'add' : 'open');
   });
 
-  // Open button inside the empty state.
   viewport.addEventListener('click', (e) => {
     if ((e.target as HTMLElement)?.id === 'empty-open') requestOpen();
   });

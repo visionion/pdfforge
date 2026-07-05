@@ -1,9 +1,11 @@
 import type { AppState } from './appState';
-import { renderPageToCanvas, buildTextLayer } from '../render/pdfjs';
+import type { PageRef } from '../doc/ops';
+import { renderPageToCanvas, buildTextLayer, renderBlankCanvas } from '../render/pdfjs';
 
 /**
- * The scrollable page area. Re-renders all pages when the document or zoom
- * changes, and tracks which page is centered to drive the page indicator.
+ * The scrollable page area. Re-renders from the page model whenever the model
+ * or zoom changes, and tracks which page is centered for the page indicator.
+ * Each page carries a hover toolbar (rotate / duplicate / delete).
  */
 export function createViewport(state: AppState): HTMLElement {
   const root = document.createElement('main');
@@ -22,42 +24,31 @@ export function createViewport(state: AppState): HTMLElement {
 
   const pages = document.createElement('div');
   pages.className = 'pages';
-
   root.append(empty, pages);
 
   let renderToken = 0;
 
   async function render(): Promise<void> {
     const token = ++renderToken;
-    const doc = state.doc.get();
+    const model = state.editor.pages.get();
     pages.textContent = '';
-    empty.style.display = doc ? 'none' : 'grid';
-    if (!doc) return;
+    empty.style.display = model.length > 0 ? 'none' : 'grid';
+    if (model.length === 0) return;
 
     const scale = state.scale.get();
-    for (let n = 1; n <= doc.numPages; n++) {
-      if (token !== renderToken) return; // superseded by a newer render
-      const page = await doc.pdf.getPage(n);
-      if (token !== renderToken) return;
-
-      const pageEl = document.createElement('div');
-      pageEl.className = 'page';
-      pageEl.dataset.page = String(n);
-
-      const canvas = document.createElement('canvas');
-      const textLayer = document.createElement('div');
-      textLayer.className = 'text-layer';
-      pageEl.append(canvas, textLayer);
+    for (let i = 0; i < model.length; i++) {
+      if (token !== renderToken) return; // superseded
+      const ref = model[i];
+      const pageEl = buildPageShell(state, i, model.length);
       pages.appendChild(pageEl);
-
-      await renderPageToCanvas(page, canvas, scale);
-      buildTextLayer(page, textLayer, scale).catch(() => {
-        /* selection layer is best-effort; visual render already succeeded */
-      });
+      try {
+        await renderInto(state, ref, scale, pageEl, token, () => renderToken);
+      } catch {
+        pageEl.classList.add('page-error');
+      }
     }
   }
 
-  // Track the centered page for the toolbar indicator.
   root.addEventListener('scroll', () => {
     const mid = root.scrollTop + root.clientHeight / 2;
     for (const el of pages.querySelectorAll<HTMLElement>('.page')) {
@@ -68,13 +59,70 @@ export function createViewport(state: AppState): HTMLElement {
     }
   });
 
-  state.doc.subscribe(() => void render());
+  state.editor.pages.subscribe(() => void render());
   state.scale.subscribe(() => void render());
 
   return root;
 }
 
-/** Scroll a specific page into view. */
+function buildPageShell(state: AppState, index: number, total: number): HTMLElement {
+  const pageEl = document.createElement('div');
+  pageEl.className = 'page';
+  pageEl.dataset.page = String(index + 1);
+
+  const controls = document.createElement('div');
+  controls.className = 'page-controls';
+  controls.append(
+    ctrlBtn('⟲', 'Rotate left', () => state.editor.rotate(index, -90)),
+    ctrlBtn('⟳', 'Rotate right', () => state.editor.rotate(index, 90)),
+    ctrlBtn('⧉', 'Duplicate', () => state.editor.duplicate(index)),
+    ctrlBtn('✕', 'Delete', () => state.editor.remove(index), total <= 1),
+  );
+  pageEl.appendChild(controls);
+  return pageEl;
+}
+
+async function renderInto(
+  state: AppState,
+  ref: PageRef,
+  scale: number,
+  pageEl: HTMLElement,
+  token: number,
+  currentToken: () => number,
+): Promise<void> {
+  if (ref.blank) {
+    const canvas = renderBlankCanvas(ref.blank.width, ref.blank.height, scale);
+    pageEl.appendChild(canvas);
+    return;
+  }
+  const page = await state.editor.renderPage(ref);
+  if (token !== currentToken() || !page) return;
+
+  const canvas = document.createElement('canvas');
+  const textLayer = document.createElement('div');
+  textLayer.className = 'text-layer';
+  pageEl.append(canvas, textLayer);
+
+  await renderPageToCanvas(page, canvas, scale, ref.rotation);
+  buildTextLayer(page, textLayer, scale, ref.rotation).catch(() => {
+    /* selection layer is best-effort */
+  });
+}
+
+function ctrlBtn(label: string, title: string, onClick: () => void, disabled = false): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.className = 'page-ctrl';
+  b.textContent = label;
+  b.title = title;
+  if (disabled) b.disabled = true;
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+  return b;
+}
+
+/** Scroll a specific 1-based page into view. */
 export function scrollToPage(viewport: HTMLElement, page: number): void {
   const el = viewport.querySelector<HTMLElement>(`.page[data-page="${page}"]`);
   el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
