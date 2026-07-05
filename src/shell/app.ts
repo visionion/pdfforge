@@ -8,6 +8,7 @@ import { openCompressPanel } from './compressPanel';
 import { openMetadataPanel } from './metadataPanel';
 import { openSignatureDialog } from '../features/sign/signatureDialog';
 import { initPwa } from '../pwa/pwa';
+import { track } from '../analytics';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
 import { installShortcuts } from './shortcuts';
@@ -76,11 +77,13 @@ export function mountApp(root: HTMLElement): void {
       const doc = await openPdf(buffer, file.name, password);
       if (how === 'add' && state.editor.hasDoc()) {
         state.editor.addFile(doc);
+        track('add_pdf');
       } else {
         state.commands.clear();
         state.currentPage.set(1);
         state.editor.loadPrimary(doc);
         document.title = `${file.name} — pdfforge`;
+        track('open_pdf', { pages: doc.numPages });
       }
     } catch (err) {
       if (err instanceof PasswordRequiredError) {
@@ -101,6 +104,7 @@ export function mountApp(root: HTMLElement): void {
     try {
       const bytes = await state.editor.export();
       downloadPdf(bytes, state.editor.exportName());
+      track('download', { pages: state.editor.pages.get().length });
     } catch (err) {
       notify('Export failed. Please try again.');
       console.error(err);

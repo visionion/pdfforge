@@ -1,6 +1,7 @@
 import type { AppState } from './appState';
 import { createToolsMenu, type ToolActions } from './toolsMenu';
 import { promptInstall } from '../pwa/pwa';
+import { openAboutPanel } from './aboutPanel';
 
 export interface ToolbarCallbacks {
   onOpen: () => void;
@@ -40,6 +41,9 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
   installBtn.hidden = true;
   state.installPrompt.subscribe((p) => (installBtn.hidden = p === null));
 
+  const helpBtn = button('?', 'icon', () => openAboutPanel());
+  helpBtn.title = 'About pdfforge';
+
   const themeBtn = button('◐', 'icon', () => state.toggleTheme());
   themeBtn.title = 'Toggle theme';
 
@@ -58,6 +62,7 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
     toolsMenu,
     downloadBtn,
     installBtn,
+    helpBtn,
     themeBtn,
   );
 

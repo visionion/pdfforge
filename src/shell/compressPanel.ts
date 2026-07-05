@@ -1,5 +1,6 @@
 import type { AppState } from './appState';
 import { downloadPdf } from '../export/download';
+import { track } from '../analytics';
 
 function fmt(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -54,6 +55,7 @@ export function openCompressPanel(state: AppState): void {
     const before = state.editor.originalSize();
     const after = result.length;
     const pct = before > 0 ? Math.round((1 - after / before) * 100) : 0;
+    track('compress', { dpi: dpi(), reduced_pct: pct });
     status.textContent = before > 0
       ? `${fmt(before)} → ${fmt(after)} (${pct >= 0 ? pct + '% smaller' : Math.abs(pct) + '% larger'})`
       : `Compressed to ${fmt(after)}`;

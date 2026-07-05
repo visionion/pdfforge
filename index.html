@@ -35,13 +35,46 @@
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Any (web browser)",
         "url": "https://editpdf.visionion.dev/",
-        "description": "A 100% client-side PDF editor and builder. Edit, annotate, sign, OCR and build PDFs in the browser with no uploads.",
+        "description": "A 100% client-side PDF editor and builder. Edit, annotate, sign, OCR and build PDFs in the browser with no uploads, no signup and no watermark.",
+        "browserRequirements": "Requires a modern web browser with JavaScript.",
+        "featureList": [
+          "Edit existing PDF text",
+          "Merge, split, rotate, reorder and delete pages",
+          "Highlight, draw, add shapes and sticky notes",
+          "Fill and flatten forms",
+          "Sign PDFs (draw, type or upload)",
+          "Insert images and hyperlinks",
+          "Redact text so it cannot be recovered",
+          "OCR scanned PDFs into searchable, selectable text",
+          "Convert PDFs to images and images to PDF",
+          "Compress and optimize PDFs",
+          "Edit or remove document metadata",
+          "Works offline as an installable app"
+        ],
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
       }
     </script>
   </head>
   <body>
     <div id="app"></div>
+    <noscript>
+      <main style="max-width: 720px; margin: 40px auto; padding: 0 20px; font-family: system-ui, sans-serif;">
+        <h1>pdfforge — free, private PDF editor</h1>
+        <p>Edit, annotate, sign, merge, split, OCR and build PDFs entirely in your browser.
+          Your files never leave your device — no upload, no signup, no watermark.</p>
+        <p>pdfforge needs JavaScript enabled to run. Please enable JavaScript and reload.</p>
+        <h2>Features</h2>
+        <ul>
+          <li>Edit existing PDF text; add text, images and shapes</li>
+          <li>Highlight, draw, comment and redact</li>
+          <li>Fill and flatten forms; sign documents</li>
+          <li>Merge, split, rotate and reorder pages</li>
+          <li>OCR scanned PDFs into searchable text</li>
+          <li>Convert between PDF and images; compress; edit metadata</li>
+          <li>Works offline as an installable app</li>
+        </ul>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

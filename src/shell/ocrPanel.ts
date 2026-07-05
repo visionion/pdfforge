@@ -1,5 +1,6 @@
 import type { AppState } from './appState';
 import { downloadPdf } from '../export/download';
+import { track } from '../analytics';
 
 const LANGS: Array<[string, string]> = [
   ['eng', 'English'],
@@ -87,6 +88,7 @@ export function openOcrPanel(state: AppState): void {
     setBusy(true);
     const bytes = await state.editor.makeSearchable(lang.value, 150, onProgress);
     downloadPdf(bytes, `${state.editor.baseName()}-searchable.pdf`);
+    track('ocr_searchable', { lang: lang.value });
     status.textContent = 'Downloaded searchable PDF.';
     setBusy(false);
   });
