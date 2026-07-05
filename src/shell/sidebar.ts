@@ -4,8 +4,9 @@ import { renderThumbnail, renderBlankCanvas } from '../render/pdfjs';
 import { scrollToPage } from './viewport';
 
 /**
- * Thumbnail sidebar rendered from the page model. Clicking scrolls the viewport;
- * dragging a thumbnail reorders pages (an undoable move command).
+ * Thumbnail sidebar rendered lazily from the page model. Clicking scrolls the
+ * viewport; dragging a thumbnail reorders pages. Thumbnails render only as they
+ * scroll into view, so large documents stay responsive.
  */
 export function createSidebar(state: AppState, viewport: HTMLElement): HTMLElement {
   const root = document.createElement('aside');
@@ -17,18 +18,34 @@ export function createSidebar(state: AppState, viewport: HTMLElement): HTMLEleme
 
   let renderToken = 0;
   let dragFrom: number | null = null;
+  let observer: IntersectionObserver | null = null;
 
-  async function render(): Promise<void> {
+  function render(): void {
     const token = ++renderToken;
+    observer?.disconnect();
     const model = state.editor.pages.get();
     list.textContent = '';
     if (model.length === 0) return;
 
+    observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const item = entry.target as HTMLElement;
+          if (item.dataset.rendered) continue;
+          item.dataset.rendered = '1';
+          observer?.unobserve(item);
+          void paintThumb(state, model[Number(item.dataset.idx)], item, token, () => renderToken);
+        }
+      },
+      { root, rootMargin: '400px 0px' },
+    );
+
     for (let i = 0; i < model.length; i++) {
-      if (token !== renderToken) return;
       const item = buildThumb(i);
+      item.dataset.idx = String(i);
       list.appendChild(item);
-      await paintThumb(state, model[i], item, token, () => renderToken);
+      observer.observe(item);
     }
     highlight(state.currentPage.get());
   }
@@ -73,7 +90,7 @@ export function createSidebar(state: AppState, viewport: HTMLElement): HTMLEleme
     }
   }
 
-  state.editor.pages.subscribe(() => void render());
+  state.editor.pages.subscribe(() => render());
   state.currentPage.subscribe((n) => highlight(n));
 
   return root;

@@ -39,6 +39,7 @@ export class AppState {
   readonly activeTool = new Signal<Tool>('select');
   readonly toolColor = new Signal<string>('#e5393a');
   readonly pendingSignature = new Signal<PendingSignature | null>(null);
+  readonly installPrompt = new Signal<Event | null>(null);
 
   readonly minScale = 0.25;
   readonly maxScale = 4;

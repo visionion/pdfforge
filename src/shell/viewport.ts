@@ -1,13 +1,21 @@
 import type { AppState } from './appState';
 import type { PageRef } from '../doc/ops';
+import type { PageOverlay } from '../overlay/konvaLayer';
 import { renderPageToCanvas, buildTextLayer, renderBlankCanvas } from '../render/pdfjs';
-import { PageOverlay } from '../overlay/konvaLayer';
 import { attachTextEdit } from '../features/text-edit/editText';
 
+type OverlayCtor = typeof PageOverlay;
+let overlayCtor: OverlayCtor | null = null;
+async function ensureOverlayCtor(): Promise<OverlayCtor> {
+  // Lazy-load Konva (~57 KB gzip) only once a document is open.
+  if (!overlayCtor) overlayCtor = (await import('../overlay/konvaLayer')).PageOverlay;
+  return overlayCtor;
+}
+
 /**
- * The scrollable page area. Re-renders from the page model whenever the model
- * or zoom changes, and tracks which page is centered for the page indicator.
- * Each page carries a hover toolbar (rotate / duplicate / delete).
+ * The scrollable page area. Page shells are created immediately (sized to each
+ * page) but their canvas/overlay render lazily via IntersectionObserver, so a
+ * 100+ page document opens instantly and memory stays bounded.
  */
 export function createViewport(state: AppState): HTMLElement {
   const root = document.createElement('main');
@@ -34,28 +42,55 @@ export function createViewport(state: AppState): HTMLElement {
 
   let renderToken = 0;
   let overlays: PageOverlay[] = [];
+  let observer: IntersectionObserver | null = null;
 
   async function render(): Promise<void> {
     const token = ++renderToken;
     for (const o of overlays) o.destroy();
     overlays = [];
+    observer?.disconnect();
+
     const model = state.editor.pages.get();
     pages.textContent = '';
     empty.style.display = model.length > 0 ? 'none' : 'grid';
     if (model.length === 0) return;
 
     const scale = state.scale.get();
-    for (let i = 0; i < model.length; i++) {
-      if (token !== renderToken) return; // superseded
-      const ref = model[i];
-      const pageEl = buildPageShell(state, i, model.length);
-      pages.appendChild(pageEl);
+    observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const shell = entry.target as HTMLElement;
+          if (shell.dataset.rendered) continue;
+          shell.dataset.rendered = '1';
+          observer?.unobserve(shell);
+          void renderShell(shell);
+        }
+      },
+      { root, rootMargin: '600px 0px' },
+    );
+
+    async function renderShell(shell: HTMLElement): Promise<void> {
+      const ref = model[Number(shell.dataset.idx)];
       try {
-        const overlay = await renderInto(state, ref, scale, pageEl, token, () => renderToken);
+        const overlay = await renderInto(state, ref, scale, shell, token, () => renderToken);
         if (overlay) overlays.push(overlay);
       } catch {
-        pageEl.classList.add('page-error');
+        shell.classList.add('page-error');
       }
+    }
+
+    for (let i = 0; i < model.length; i++) {
+      if (token !== renderToken) return;
+      const ref = model[i];
+      const dims = await pageDims(state, ref);
+      if (token !== renderToken) return;
+      const shell = buildPageShell(state, i, model.length);
+      shell.dataset.idx = String(i);
+      shell.style.width = `${Math.floor(dims.w * scale)}px`;
+      shell.style.height = `${Math.floor(dims.h * scale)}px`;
+      pages.appendChild(shell);
+      observer.observe(shell);
     }
   }
 
@@ -73,6 +108,15 @@ export function createViewport(state: AppState): HTMLElement {
   state.scale.subscribe(() => void render());
 
   return root;
+}
+
+async function pageDims(state: AppState, ref: PageRef): Promise<{ w: number; h: number }> {
+  if (ref.blank) return { w: ref.blank.width, h: ref.blank.height };
+  const page = await state.editor.renderPage(ref);
+  if (!page) return { w: 595, h: 842 };
+  const vp = page.getViewport({ scale: 1 });
+  // Account for 90/270 rotation swapping the page aspect.
+  return ref.rotation % 180 === 0 ? { w: vp.width, h: vp.height } : { w: vp.height, h: vp.width };
 }
 
 function buildPageShell(state: AppState, index: number, total: number): HTMLElement {
@@ -103,8 +147,8 @@ async function renderInto(
   if (ref.blank) {
     const canvas = renderBlankCanvas(ref.blank.width, ref.blank.height, scale);
     pageEl.appendChild(canvas);
-    const overlayEl = makeOverlayEl(pageEl);
-    return new PageOverlay(overlayEl, state, ref.id, ref.blank.height, ref.blank.width * scale, ref.blank.height * scale);
+    const Ctor = await ensureOverlayCtor();
+    return new Ctor(makeOverlayEl(pageEl), state, ref.id, ref.blank.height, ref.blank.width * scale, ref.blank.height * scale);
   }
   const page = await state.editor.renderPage(ref);
   if (token !== currentToken() || !page) return null;
@@ -119,13 +163,11 @@ async function renderInto(
     /* selection layer is best-effort */
   });
 
-  // Annotation + text-edit — unrotated pages only (coords are authored in
-  // unrotated PDF space; per-page rotation would need a coordinate transform).
-  if (ref.rotation !== 0) return null;
+  if (ref.rotation !== 0) return null; // annotations author in unrotated space only
   const vp1 = page.getViewport({ scale: 1 });
   attachTextEdit(pageEl, canvas, textLayer, state, ref.id, vp1.height);
-  const overlayEl = makeOverlayEl(pageEl);
-  return new PageOverlay(overlayEl, state, ref.id, vp1.height, vp1.width * scale, vp1.height * scale);
+  const Ctor = await ensureOverlayCtor();
+  return new Ctor(makeOverlayEl(pageEl), state, ref.id, vp1.height, vp1.width * scale, vp1.height * scale);
 }
 
 function makeOverlayEl(pageEl: HTMLElement): HTMLDivElement {

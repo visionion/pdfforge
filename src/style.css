@@ -164,7 +164,8 @@ button.icon {
 .thumb {
   position: relative;
   padding: 0;
-  background: transparent;
+  min-height: 180px;
+  background: var(--surface);
   border: 2px solid transparent;
   border-radius: 6px;
   display: flex;

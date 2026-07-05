@@ -7,6 +7,7 @@ import { openOcrPanel } from './ocrPanel';
 import { openCompressPanel } from './compressPanel';
 import { openMetadataPanel } from './metadataPanel';
 import { openSignatureDialog } from '../features/sign/signatureDialog';
+import { initPwa } from '../pwa/pwa';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
 import { installShortcuts } from './shortcuts';
@@ -150,6 +151,7 @@ export function mountApp(root: HTMLElement): void {
   });
 
   installShortcuts(state, requestOpen);
+  initPwa(state);
 }
 
 async function buildFromImages(files: File[], state: AppState): Promise<void> {
