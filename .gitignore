@@ -16,6 +16,13 @@ dist-ssr/
 *.local
 .vite/
 
+# Generated: pdf.js assets copied from node_modules at build time
+public/pdfjs/
+
+# Local verification scratch
+public/__sample.pdf
+gen-sample.mjs
+
 # Test / coverage
 coverage/
 playwright-report/

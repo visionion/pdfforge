@@ -5,7 +5,10 @@
   "type": "module",
   "description": "100% client-side PDF editor and builder",
   "scripts": {
+    "copy-assets": "node scripts/copy-pdfjs-assets.mjs",
+    "predev": "npm run copy-assets",
     "dev": "vite",
+    "prebuild": "npm run copy-assets",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",

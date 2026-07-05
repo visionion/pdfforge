@@ -1,15 +1,18 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker';
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
-// Wire pdf.js to its worker via Vite's ?worker import so rendering never blocks
-// the main thread.
-pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker();
+// Let pdf.js instantiate its own worker from a bundled URL. This is the robust
+// Vite setup for both dev and production; a `?worker` module-worker port breaks
+// render-task messaging in the production bundle.
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 export interface OpenedDoc {
   readonly pdf: PDFDocumentProxy;
   readonly name: string;
   readonly numPages: number;
+  /** Retained copy of the original bytes, for pdf-lib export. */
+  readonly bytes: Uint8Array;
 }
 
 export class PasswordRequiredError extends Error {
@@ -32,9 +35,19 @@ export class InvalidPdfError extends Error {
  * non-PDF input raises InvalidPdfError.
  */
 export async function openPdf(data: ArrayBuffer, name: string): Promise<OpenedDoc> {
+  // Keep our own copy for pdf-lib export; hand the original buffer to pdf.js
+  // (matching the render path that is known to work).
+  const bytes = new Uint8Array(data.slice(0));
   try {
-    const pdf = await pdfjsLib.getDocument({ data }).promise;
-    return { pdf, name, numPages: pdf.numPages };
+    const pdf = await pdfjsLib.getDocument({
+      data,
+      // Serve non-embedded standard-14 fonts and CJK cmaps locally, so pages
+      // that reference them render (and don't stall waiting on font data).
+      standardFontDataUrl: '/pdfjs/standard_fonts/',
+      cMapUrl: '/pdfjs/cmaps/',
+      cMapPacked: true,
+    }).promise;
+    return { pdf, name, numPages: pdf.numPages, bytes };
   } catch (err: unknown) {
     const name_ = (err as { name?: string })?.name;
     if (name_ === 'PasswordException') throw new PasswordRequiredError();
