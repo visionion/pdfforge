@@ -26,6 +26,8 @@ export interface ExportOptions {
   rasters?: Map<string, RasterPage>;
   /** Per-slot invisible OCR text layer, making scanned pages searchable. */
   searchableText?: Map<string, SearchableWord[]>;
+  /** Document metadata to write (title/author/…); omit to leave default. */
+  metadata?: import('../features/metadata/metadata').MetadataValues;
 }
 
 /**
@@ -96,6 +98,11 @@ export async function exportPdf(
     }
     out.addPage(copied);
     await drawFor(ref.id, copied);
+  }
+
+  if (options.metadata) {
+    const { applyMetadata } = await import('../features/metadata/metadata');
+    applyMetadata(out, options.metadata);
   }
 
   return out.save();

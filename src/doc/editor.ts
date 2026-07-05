@@ -40,6 +40,7 @@ interface Source {
 export class DocEditor {
   readonly pages = new Signal<PageModel>([]);
   readonly annotations = new Signal<AnnotationModel>([]);
+  readonly metadata = new Signal<import('../features/metadata/metadata').MetadataValues | null>(null);
   private readonly sources = new Map<string, Source>();
   private name = 'document.pdf';
   private sourceSeq = 0;
@@ -53,6 +54,7 @@ export class DocEditor {
     this.sources.set('main', { pdf: doc.pdf, bytes: doc.bytes });
     this.name = doc.name;
     this.annotations.set([]);
+    this.metadata.set(null);
     this.pages.set(modelFromSource('main', doc.numPages));
   }
 
@@ -233,7 +235,19 @@ export class DocEditor {
     const rasters = await this.rasterizeRedactedPages(anns);
     const bytes = new Map<string, SourceBytes>();
     for (const [id, source] of this.sources) bytes.set(id, source.bytes);
-    return exportPdf(this.pages.get(), bytes, { annotations: anns, rasters });
+    return exportPdf(this.pages.get(), bytes, {
+      annotations: anns,
+      rasters,
+      metadata: this.metadata.get() ?? undefined,
+    });
+  }
+
+  /** Read the primary source's metadata. */
+  async readMetadata(): Promise<import('../features/metadata/metadata').MetadataValues> {
+    const src = this.sources.get('main');
+    const { readMetadata, EMPTY_METADATA } = await import('../features/metadata/metadata');
+    if (!src) return { ...EMPTY_METADATA };
+    return readMetadata(src.bytes);
   }
 
   /**

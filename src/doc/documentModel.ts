@@ -34,13 +34,14 @@ export class InvalidPdfError extends Error {
  * PasswordRequiredError so the caller can route to the unlock flow (U15);
  * non-PDF input raises InvalidPdfError.
  */
-export async function openPdf(data: ArrayBuffer, name: string): Promise<OpenedDoc> {
+export async function openPdf(data: ArrayBuffer, name: string, password?: string): Promise<OpenedDoc> {
   // Keep our own copy for pdf-lib export; hand the original buffer to pdf.js
   // (matching the render path that is known to work).
   const bytes = new Uint8Array(data.slice(0));
   try {
     const pdf = await pdfjsLib.getDocument({
       data,
+      password,
       // Serve non-embedded standard-14 fonts and CJK cmaps locally, so pages
       // that reference them render (and don't stall waiting on font data).
       standardFontDataUrl: '/pdfjs/standard_fonts/',

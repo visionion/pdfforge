@@ -5,6 +5,7 @@ import { openFormPanel } from './formPanel';
 import { openConvertPanel } from './convertPanel';
 import { openOcrPanel } from './ocrPanel';
 import { openCompressPanel } from './compressPanel';
+import { openMetadataPanel } from './metadataPanel';
 import { openSignatureDialog } from '../features/sign/signatureDialog';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
@@ -45,6 +46,7 @@ export function mountApp(root: HTMLElement): void {
       onImages: () => openConvertPanel(state),
       onOcr: () => openOcrPanel(state),
       onCompress: () => openCompressPanel(state),
+      onMetadata: () => void openMetadataPanel(state),
     },
   });
 
@@ -67,10 +69,10 @@ export function mountApp(root: HTMLElement): void {
   shell.append(toolbar, toolstrip, body, fileInput);
   root.appendChild(shell);
 
-  async function handleFile(file: File, how: 'open' | 'add'): Promise<void> {
+  async function handleFile(file: File, how: 'open' | 'add', password?: string): Promise<void> {
     try {
       const buffer = await file.arrayBuffer();
-      const doc = await openPdf(buffer, file.name);
+      const doc = await openPdf(buffer, file.name, password);
       if (how === 'add' && state.editor.hasDoc()) {
         state.editor.addFile(doc);
       } else {
@@ -81,7 +83,9 @@ export function mountApp(root: HTMLElement): void {
       }
     } catch (err) {
       if (err instanceof PasswordRequiredError) {
-        notify('This PDF is password protected. Unlocking is coming soon.');
+        const pw = window.prompt('This PDF is password protected. Enter the password to open it:');
+        if (pw) return handleFile(file, how, pw);
+        notify('A password is required to open this PDF.');
       } else if (err instanceof InvalidPdfError) {
         notify('That file could not be opened as a PDF.');
       } else {
