@@ -3,6 +3,7 @@ import { createToolbar } from './toolbar';
 import { createToolStrip } from './toolstrip';
 import { openFormPanel } from './formPanel';
 import { openConvertPanel } from './convertPanel';
+import { openOcrPanel } from './ocrPanel';
 import { openSignatureDialog } from '../features/sign/signatureDialog';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
@@ -41,6 +42,7 @@ export function mountApp(root: HTMLElement): void {
       onForm: () => void openFormPanel(state),
       onSign: () => void handleSign(),
       onImages: () => openConvertPanel(state),
+      onOcr: () => openOcrPanel(state),
     },
   });
 

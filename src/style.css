@@ -474,6 +474,36 @@ button.icon {
   margin-top: 18px;
 }
 
+/* ---------- OCR panel ---------- */
+.ocr-status {
+  min-height: 18px;
+  margin: 10px 0 6px;
+}
+.ocr-bar {
+  height: 6px;
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ocr-bar-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.ocr-output {
+  width: 100%;
+  min-height: 180px;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.5 ui-monospace, monospace;
+  resize: vertical;
+}
+
 /* ---------- Signature dialog ---------- */
 .sign-tabs {
   display: flex;

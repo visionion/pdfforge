@@ -168,6 +168,16 @@ export async function rasterizePage(
   return { bytes, widthPts: viewport.width / scale, heightPts: viewport.height / scale };
 }
 
+/** Render a page to a fresh canvas at an exact scale (for OCR / rasterization). */
+export async function renderToCanvas(page: PDFPageProxy, scale: number, rotation = 0): Promise<HTMLCanvasElement> {
+  const viewport = page.getViewport({ scale, rotation: normalizedRotation(page, rotation) });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  await enqueueRender(() => page.render({ canvas, viewport }).promise);
+  return canvas;
+}
+
 /** Render a plain white blank page of the given PDF-point size to a canvas. */
 export function renderBlankCanvas(
   width: number,

@@ -12,10 +12,20 @@ export interface RasterPage {
   readonly heightPts: number;
 }
 
+/** An OCR word placed as invisible-but-selectable text (PDF points). */
+export interface SearchableWord {
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+  readonly size: number;
+}
+
 export interface ExportOptions {
   annotations?: AnnotationModel;
   /** Per-slot (by PageRef id) rasterized replacements — e.g. redacted pages. */
   rasters?: Map<string, RasterPage>;
+  /** Per-slot invisible OCR text layer, making scanned pages searchable. */
+  searchableText?: Map<string, SearchableWord[]>;
 }
 
 /**
@@ -44,8 +54,18 @@ export async function exportPdf(
     return doc;
   }
 
+  const searchable = options.searchableText ?? new Map<string, SearchableWord[]>();
+
   async function drawFor(pageId: string, page: PDFPage): Promise<void> {
     for (const ann of annotationsForPage(annotations, pageId)) await drawAnnotation(out, page, ann, font);
+    for (const w of searchable.get(pageId) ?? []) {
+      if (!w.text) continue;
+      try {
+        page.drawText(w.text, { x: w.x, y: w.y, size: w.size, font, opacity: 0 });
+      } catch {
+        /* skip words the standard font can't encode (non-Latin scripts) */
+      }
+    }
   }
 
   for (const ref of model) {

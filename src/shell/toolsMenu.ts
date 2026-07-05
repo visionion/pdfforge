@@ -4,6 +4,7 @@ export interface ToolActions {
   onForm: () => void;
   onSign: () => void;
   onImages: () => void;
+  onOcr?: () => void;
   onCompress?: () => void;
   onProtect?: () => void;
   onMetadata?: () => void;
@@ -25,6 +26,7 @@ export function createToolsMenu(state: AppState, actions: ToolActions): HTMLElem
   const items: Array<[string, (() => void) | undefined]> = [
     ['Fill form', actions.onForm],
     ['Add signature', actions.onSign],
+    ['OCR / searchable text', actions.onOcr],
     ['Export as images', actions.onImages],
     ['Compress', actions.onCompress],
     ['Password protect', actions.onProtect],

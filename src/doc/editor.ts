@@ -267,4 +267,75 @@ export class DocEditor {
   baseName(): string {
     return this.name.replace(/\.pdf$/i, '') || 'document';
   }
+
+  private sourceBytesMap(): Map<string, SourceBytes> {
+    const bytes = new Map<string, SourceBytes>();
+    for (const [id, source] of this.sources) bytes.set(id, source.bytes);
+    return bytes;
+  }
+
+  /** OCR every page and export a searchable PDF (invisible text over each page). */
+  async makeSearchable(
+    lang: string,
+    dpi: number,
+    onProgress?: (r: { page: number; total: number; status: string; progress: number }) => void,
+  ): Promise<Uint8Array> {
+    const { getOcrEngine } = await import('../engines/ocr');
+    const { renderToCanvas } = await import('../render/pdfjs');
+    const { wordsToSearchable } = await import('../engines/ocr/searchable');
+    const { exportPdf } = await import('../export/pdflib');
+
+    const engine = await getOcrEngine();
+    const pages = this.pages.get();
+    const scale = dpi / 72;
+    const searchable = new Map<string, import('../export/pdflib').SearchableWord[]>();
+    try {
+      for (let i = 0; i < pages.length; i++) {
+        const ref = pages[i];
+        const page = await this.renderPage(ref);
+        if (!page) continue;
+        const canvas = await renderToCanvas(page, scale, ref.rotation);
+        const result = await engine.recognize(canvas, lang, (p) =>
+          onProgress?.({ page: i + 1, total: pages.length, status: p.status, progress: p.progress }),
+        );
+        const heightPts = page.getViewport({ scale: 1 }).height;
+        searchable.set(ref.id, wordsToSearchable(result.words, scale, heightPts));
+      }
+    } finally {
+      await engine.terminate();
+    }
+    return exportPdf(pages, this.sourceBytesMap(), {
+      annotations: this.annotations.get(),
+      searchableText: searchable,
+    });
+  }
+
+  /** OCR every page and return the extracted text. */
+  async extractText(
+    lang: string,
+    dpi: number,
+    onProgress?: (r: { page: number; total: number; status: string; progress: number }) => void,
+  ): Promise<string> {
+    const { getOcrEngine } = await import('../engines/ocr');
+    const { renderToCanvas } = await import('../render/pdfjs');
+    const engine = await getOcrEngine();
+    const pages = this.pages.get();
+    const scale = dpi / 72;
+    const parts: string[] = [];
+    try {
+      for (let i = 0; i < pages.length; i++) {
+        const ref = pages[i];
+        const page = await this.renderPage(ref);
+        if (!page) continue;
+        const canvas = await renderToCanvas(page, scale, ref.rotation);
+        const result = await engine.recognize(canvas, lang, (p) =>
+          onProgress?.({ page: i + 1, total: pages.length, status: p.status, progress: p.progress }),
+        );
+        parts.push(result.text.trim());
+      }
+    } finally {
+      await engine.terminate();
+    }
+    return parts.join('\n\n');
+  }
 }
