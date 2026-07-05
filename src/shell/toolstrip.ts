@@ -8,6 +8,7 @@ interface ToolDef {
 
 const TOOLS: ToolDef[] = [
   { tool: 'select', label: 'Select', title: 'Select & select text' },
+  { tool: 'object', label: 'Move', title: 'Move & resize images' },
   { tool: 'edit-text', label: 'Edit text', title: 'Edit existing text (whiteout + retype)' },
   { tool: 'highlight', label: 'Highlight', title: 'Highlight' },
   { tool: 'ink', label: 'Draw', title: 'Freehand pen' },
@@ -17,6 +18,9 @@ const TOOLS: ToolDef[] = [
   { tool: 'arrow', label: 'Arrow', title: 'Arrow' },
   { tool: 'text', label: 'Text', title: 'Text box' },
   { tool: 'note', label: 'Note', title: 'Sticky note' },
+  { tool: 'image', label: 'Image', title: 'Insert image' },
+  { tool: 'link', label: 'Link', title: 'Add hyperlink' },
+  { tool: 'redact', label: 'Redact', title: 'Redact (removes text on export)' },
 ];
 
 /** Annotation tool palette. Selecting a tool sets state.activeTool. */

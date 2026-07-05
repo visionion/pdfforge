@@ -105,6 +105,44 @@ export async function renderThumbnail(
   return canvas;
 }
 
+interface RasterResult {
+  bytes: Uint8Array;
+  widthPts: number;
+  heightPts: number;
+}
+
+/**
+ * Render a page to a PNG raster at the given scale, baking opaque black boxes
+ * over the redaction rects (in PDF points) so covered content is destroyed.
+ */
+export async function rasterizePage(
+  page: PDFPageProxy,
+  scale: number,
+  redactRectsPts: Array<{ x: number; y: number; width: number; height: number }>,
+  pageHeightPts: number,
+): Promise<RasterResult> {
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D canvas context unavailable');
+
+  await enqueueRender(() => page.render({ canvas, viewport }).promise);
+
+  ctx.fillStyle = '#000000';
+  for (const r of redactRectsPts) {
+    ctx.fillRect(r.x * scale, (pageHeightPts - (r.y + r.height)) * scale, r.width * scale, r.height * scale);
+  }
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { bytes, widthPts: viewport.width / scale, heightPts: viewport.height / scale };
+}
+
 /** Render a plain white blank page of the given PDF-point size to a canvas. */
 export function renderBlankCanvas(
   width: number,

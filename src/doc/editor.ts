@@ -19,6 +19,9 @@ import {
   type Annotation,
   addAnnotation,
   removeAnnotation,
+  updateAnnotation,
+  annotationsForPage,
+  pagesWithRedactions,
 } from '../overlay/annotations';
 
 interface Source {
@@ -126,6 +129,17 @@ export class DocEditor {
     });
   }
 
+  /** Update an annotation's geometry (image drag/resize) as an undoable command. */
+  updateGeometry(id: string, geo: { x: number; y: number; width: number; height: number }): void {
+    const prev = this.annotations.get();
+    const next = updateAnnotation(prev, id, geo as Partial<Annotation>);
+    this.commands.execute({
+      label: 'Move object',
+      apply: () => this.annotations.set(next),
+      invert: () => this.annotations.set(prev),
+    });
+  }
+
   /** Append another opened PDF's pages (merge / insert-from-file). */
   addFile(doc: OpenedDoc): void {
     const id = this.register(doc);
@@ -146,9 +160,35 @@ export class DocEditor {
   async export(): Promise<Uint8Array> {
     // Lazy-load the pdf-lib export engine so it isn't in the initial bundle.
     const { exportPdf } = await import('../export/pdflib');
+    const anns = this.annotations.get();
+    const rasters = await this.rasterizeRedactedPages(anns);
     const bytes = new Map<string, SourceBytes>();
     for (const [id, source] of this.sources) bytes.set(id, source.bytes);
-    return exportPdf(this.pages.get(), bytes, { annotations: this.annotations.get() });
+    return exportPdf(this.pages.get(), bytes, { annotations: anns, rasters });
+  }
+
+  /**
+   * Redacting a page flattens it to a raster so covered text cannot be
+   * extracted. Renders each redacted page and bakes black boxes into the image.
+   */
+  private async rasterizeRedactedPages(
+    anns: AnnotationModel,
+  ): Promise<Map<string, import('../export/pdflib').RasterPage>> {
+    const rasters = new Map<string, import('../export/pdflib').RasterPage>();
+    const redacted = pagesWithRedactions(anns);
+    if (redacted.size === 0) return rasters;
+    const { rasterizePage } = await import('../render/pdfjs');
+    for (const ref of this.pages.get()) {
+      if (!redacted.has(ref.id) || ref.blank) continue;
+      const page = await this.renderPage(ref);
+      if (!page) continue;
+      const rects = annotationsForPage(anns, ref.id)
+        .filter((a) => a.type === 'redact')
+        .map((a) => ({ x: (a as { x: number }).x, y: (a as { y: number }).y, width: (a as { width: number }).width, height: (a as { height: number }).height }));
+      const heightPts = page.getViewport({ scale: 1 }).height;
+      rasters.set(ref.id, await rasterizePage(page, 2, rects, heightPts));
+    }
+    return rasters;
   }
 
   exportName(): string {

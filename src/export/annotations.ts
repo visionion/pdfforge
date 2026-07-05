@@ -1,4 +1,13 @@
-import { rgb, BlendMode, type PDFPage, type PDFFont, type RGB } from 'pdf-lib';
+import {
+  rgb,
+  BlendMode,
+  PDFName,
+  PDFString,
+  type PDFDocument,
+  type PDFPage,
+  type PDFFont,
+  type RGB,
+} from 'pdf-lib';
 import type { Annotation } from '../overlay/annotations';
 
 export function hexToRgb(hex: string): RGB {
@@ -8,38 +17,35 @@ export function hexToRgb(hex: string): RGB {
   return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
 }
 
+export function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 /** Draw a single annotation onto a pdf-lib page (coordinates already in PDF points). */
-export function drawAnnotation(page: PDFPage, ann: Annotation, font: PDFFont): void {
-  const color = hexToRgb(ann.color);
+export async function drawAnnotation(
+  doc: PDFDocument,
+  page: PDFPage,
+  ann: Annotation,
+  font: PDFFont,
+): Promise<void> {
+  const color = ann.type === 'image' || ann.type === 'link' ? rgb(0, 0, 0) : hexToRgb(ann.color);
   switch (ann.type) {
     case 'highlight':
-      page.drawRectangle({
-        x: ann.x,
-        y: ann.y,
-        width: ann.width,
-        height: ann.height,
-        color,
-        opacity: 0.4,
-        blendMode: BlendMode.Multiply,
-      });
+      page.drawRectangle({ x: ann.x, y: ann.y, width: ann.width, height: ann.height, color, opacity: 0.4, blendMode: BlendMode.Multiply });
       break;
     case 'whiteout':
-      // Opaque cover over original content (sampled background color).
       page.drawRectangle({ x: ann.x, y: ann.y, width: ann.width, height: ann.height, color });
       break;
+    case 'redact':
+      page.drawRectangle({ x: ann.x, y: ann.y, width: ann.width, height: ann.height, color: rgb(0, 0, 0) });
+      break;
     case 'rect':
-      if (ann.fill) {
-        page.drawRectangle({ x: ann.x, y: ann.y, width: ann.width, height: ann.height, color, opacity: 0.4 });
-      } else {
-        page.drawRectangle({
-          x: ann.x,
-          y: ann.y,
-          width: ann.width,
-          height: ann.height,
-          borderColor: color,
-          borderWidth: ann.strokeWidth,
-        });
-      }
+      if (ann.fill) page.drawRectangle({ x: ann.x, y: ann.y, width: ann.width, height: ann.height, color, opacity: 0.4 });
+      else page.drawRectangle({ x: ann.x, y: ann.y, width: ann.width, height: ann.height, borderColor: color, borderWidth: ann.strokeWidth });
       break;
     case 'ellipse':
       page.drawEllipse({
@@ -53,12 +59,7 @@ export function drawAnnotation(page: PDFPage, ann: Annotation, font: PDFFont): v
       });
       break;
     case 'line':
-      page.drawLine({
-        start: { x: ann.x1, y: ann.y1 },
-        end: { x: ann.x2, y: ann.y2 },
-        thickness: ann.strokeWidth,
-        color,
-      });
+      page.drawLine({ start: { x: ann.x1, y: ann.y1 }, end: { x: ann.x2, y: ann.y2 }, thickness: ann.strokeWidth, color });
       break;
     case 'arrow':
       drawArrow(page, ann, color);
@@ -77,15 +78,19 @@ export function drawAnnotation(page: PDFPage, ann: Annotation, font: PDFFont): v
       page.drawText(ann.text, { x: ann.x, y: ann.y, size: ann.fontSize, font, color });
       break;
     case 'note':
-      // A small filled marker plus the note text beside it.
       page.drawRectangle({ x: ann.x, y: ann.y - ann.fontSize, width: ann.fontSize, height: ann.fontSize, color });
-      page.drawText(ann.text, {
-        x: ann.x + ann.fontSize + 4,
-        y: ann.y - ann.fontSize + 2,
-        size: ann.fontSize,
-        font,
-        color: rgb(0.1, 0.1, 0.1),
-      });
+      page.drawText(ann.text, { x: ann.x + ann.fontSize + 4, y: ann.y - ann.fontSize + 2, size: ann.fontSize, font, color: rgb(0.1, 0.1, 0.1) });
+      break;
+    case 'image': {
+      const bytes = dataUrlToBytes(ann.dataUrl);
+      const img = ann.format === 'jpg' ? await doc.embedJpg(bytes) : await doc.embedPng(bytes);
+      page.drawImage(img, { x: ann.x, y: ann.y, width: ann.width, height: ann.height });
+      break;
+    }
+    case 'link':
+      addUriLink(doc, page, ann.url, ann.x, ann.y, ann.width, ann.height);
+      // A subtle underline so the link is visible.
+      page.drawLine({ start: { x: ann.x, y: ann.y }, end: { x: ann.x + ann.width, y: ann.y }, thickness: 1, color: rgb(0.2, 0.35, 0.9) });
       break;
   }
 }
@@ -105,5 +110,24 @@ function drawArrow(
       thickness: ann.strokeWidth,
       color,
     });
+  }
+}
+
+/** Register a clickable URI link annotation on the page. */
+function addUriLink(doc: PDFDocument, page: PDFPage, url: string, x: number, y: number, w: number, h: number): void {
+  const ctx = doc.context;
+  const dict = ctx.obj({
+    Type: 'Annot',
+    Subtype: 'Link',
+    Rect: [x, y, x + w, y + h],
+    Border: [0, 0, 0],
+    A: { Type: 'Action', S: 'URI', URI: PDFString.of(url) },
+  });
+  const ref = ctx.register(dict);
+  const existing = page.node.get(PDFName.of('Annots'));
+  if (existing && 'push' in existing) {
+    (existing as { push: (r: unknown) => void }).push(ref);
+  } else {
+    page.node.set(PDFName.of('Annots'), ctx.obj([ref]));
   }
 }

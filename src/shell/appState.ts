@@ -5,15 +5,19 @@ import { DocEditor } from '../doc/editor';
 export type Theme = 'light' | 'dark';
 export type Tool =
   | 'select'
+  | 'object'
   | 'edit-text'
   | 'highlight'
+  | 'redact'
   | 'ink'
   | 'rect'
   | 'ellipse'
   | 'line'
   | 'arrow'
   | 'text'
-  | 'note';
+  | 'note'
+  | 'image'
+  | 'link';
 
 /**
  * Shared application state. A single instance is created at bootstrap and passed

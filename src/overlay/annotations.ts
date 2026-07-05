@@ -7,13 +7,16 @@
 export type AnnotationType =
   | 'highlight'
   | 'whiteout'
+  | 'redact'
   | 'ink'
   | 'rect'
   | 'ellipse'
   | 'line'
   | 'arrow'
   | 'text'
-  | 'note';
+  | 'note'
+  | 'image'
+  | 'link';
 
 interface Base {
   readonly id: string;
@@ -22,14 +25,34 @@ interface Base {
 }
 
 export interface RectAnnotation extends Base {
-  // 'whiteout' is an opaque fill used to cover original content before retyping.
-  readonly type: 'rect' | 'ellipse' | 'highlight' | 'whiteout';
+  // 'whiteout' = opaque cover before retyping; 'redact' = opaque black box that
+  // also forces the page to be rasterized on export so covered text is removed.
+  readonly type: 'rect' | 'ellipse' | 'highlight' | 'whiteout' | 'redact';
   readonly x: number;
   readonly y: number;
   readonly width: number;
   readonly height: number;
   readonly strokeWidth: number;
   readonly fill: boolean; // filled vs outline (highlight is always filled/translucent)
+}
+
+export interface ImageAnnotation extends Base {
+  readonly type: 'image';
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly dataUrl: string; // data:image/png;base64,... or jpeg
+  readonly format: 'png' | 'jpg';
+}
+
+export interface LinkAnnotation extends Base {
+  readonly type: 'link';
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly url: string;
 }
 
 export interface LineAnnotation extends Base {
@@ -55,7 +78,20 @@ export interface TextAnnotation extends Base {
   readonly fontSize: number;
 }
 
-export type Annotation = RectAnnotation | LineAnnotation | InkAnnotation | TextAnnotation;
+export type Annotation =
+  | RectAnnotation
+  | LineAnnotation
+  | InkAnnotation
+  | TextAnnotation
+  | ImageAnnotation
+  | LinkAnnotation;
+
+/** Page slot ids that must be rasterized on export to guarantee redaction. */
+export function pagesWithRedactions(model: AnnotationModel): Set<string> {
+  const ids = new Set<string>();
+  for (const a of model) if (a.type === 'redact') ids.add(a.pageId);
+  return ids;
+}
 
 export type AnnotationModel = readonly Annotation[];
 
