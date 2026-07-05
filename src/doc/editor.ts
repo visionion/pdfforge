@@ -14,6 +14,12 @@ import {
   mergeModels,
 } from './ops';
 import type { SourceBytes } from '../export/pdflib';
+import {
+  type AnnotationModel,
+  type Annotation,
+  addAnnotation,
+  removeAnnotation,
+} from '../overlay/annotations';
 
 interface Source {
   readonly pdf: PDFDocumentProxy;
@@ -28,6 +34,7 @@ interface Source {
  */
 export class DocEditor {
   readonly pages = new Signal<PageModel>([]);
+  readonly annotations = new Signal<AnnotationModel>([]);
   private readonly sources = new Map<string, Source>();
   private name = 'document.pdf';
   private sourceSeq = 0;
@@ -40,6 +47,7 @@ export class DocEditor {
     this.sourceSeq = 0;
     this.sources.set('main', { pdf: doc.pdf, bytes: doc.bytes });
     this.name = doc.name;
+    this.annotations.set([]);
     this.pages.set(modelFromSource('main', doc.numPages));
   }
 
@@ -85,6 +93,27 @@ export class DocEditor {
     this.apply(insertBlankPage(this.pages.get(), index), `Insert blank page`);
   }
 
+  /** Add an annotation as an undoable command. */
+  addAnnotation(annotation: Annotation): void {
+    const prev = this.annotations.get();
+    const next = addAnnotation(prev, annotation);
+    this.commands.execute({
+      label: `Add ${annotation.type}`,
+      apply: () => this.annotations.set(next),
+      invert: () => this.annotations.set(prev),
+    });
+  }
+
+  removeAnnotation(id: string): void {
+    const prev = this.annotations.get();
+    const next = removeAnnotation(prev, id);
+    this.commands.execute({
+      label: 'Delete annotation',
+      apply: () => this.annotations.set(next),
+      invert: () => this.annotations.set(prev),
+    });
+  }
+
   /** Append another opened PDF's pages (merge / insert-from-file). */
   addFile(doc: OpenedDoc): void {
     const id = this.register(doc);
@@ -107,7 +136,7 @@ export class DocEditor {
     const { exportPdf } = await import('../export/pdflib');
     const bytes = new Map<string, SourceBytes>();
     for (const [id, source] of this.sources) bytes.set(id, source.bytes);
-    return exportPdf(this.pages.get(), bytes);
+    return exportPdf(this.pages.get(), bytes, { annotations: this.annotations.get() });
   }
 
   exportName(): string {
