@@ -1,6 +1,7 @@
 import { AppState } from './appState';
 import { createToolbar } from './toolbar';
 import { createToolStrip } from './toolstrip';
+import { openFormPanel } from './formPanel';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
 import { installShortcuts } from './shortcuts';
@@ -33,6 +34,7 @@ export function mountApp(root: HTMLElement): void {
     onOpen: requestOpen,
     onAddFile: requestAdd,
     onDownload: () => void handleDownload(),
+    onForm: () => void openFormPanel(state),
   });
 
   const toolstrip = createToolStrip(state);

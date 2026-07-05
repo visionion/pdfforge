@@ -157,6 +157,28 @@ export class DocEditor {
     return source.pdf.getPage(ref.sourceIndex + 1);
   }
 
+  /** Read AcroForm fields from the primary source. */
+  async detectForm(): Promise<import('../features/forms/forms').FieldInfo[]> {
+    const src = this.sources.get('main');
+    if (!src) return [];
+    const { detectFields } = await import('../features/forms/forms');
+    return detectFields(src.bytes);
+  }
+
+  /** Fill (and optionally flatten) the form, then reload so filled values render. */
+  async applyForm(values: import('../features/forms/forms').FormValues, flatten: boolean): Promise<void> {
+    const src = this.sources.get('main');
+    if (!src) return;
+    const { fillForm } = await import('../features/forms/forms');
+    const filled = await fillForm(src.bytes, values, flatten);
+    const { openPdf } = await import('./documentModel');
+    const ab = filled.buffer.slice(filled.byteOffset, filled.byteOffset + filled.byteLength) as ArrayBuffer;
+    const reopened = await openPdf(ab, this.name);
+    this.sources.set('main', { pdf: reopened.pdf, bytes: reopened.bytes });
+    this.commands.clear(); // document bytes changed — prior history no longer valid
+    this.pages.set(this.pages.get().slice()); // force a re-render from the new source
+  }
+
   async export(): Promise<Uint8Array> {
     // Lazy-load the pdf-lib export engine so it isn't in the initial bundle.
     const { exportPdf } = await import('../export/pdflib');
