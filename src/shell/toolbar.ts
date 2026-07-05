@@ -3,6 +3,7 @@ import type { AppState } from './appState';
 export interface ToolbarCallbacks {
   onOpen: () => void;
   onAddFile: () => void;
+  onAddPage: () => void;
   onDownload: () => void;
   onForm: () => void;
   onSign: () => void;
@@ -19,6 +20,7 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
 
   const openBtn = button('Open', 'primary', cb.onOpen);
   const addBtn = button('Add PDF', 'ghost', cb.onAddFile);
+  const addPageBtn = button('+ Page', 'ghost', cb.onAddPage);
   const formBtn = button('Form', 'ghost', cb.onForm);
   const signBtn = button('Sign', 'ghost', cb.onSign);
   const downloadBtn = button('Download', 'primary', cb.onDownload);
@@ -44,6 +46,7 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
     brand,
     openBtn,
     addBtn,
+    addPageBtn,
     spacer,
     pageInfo,
     group(zoomOut, zoomLevel, zoomIn),
@@ -59,7 +62,7 @@ export function createToolbar(state: AppState, cb: ToolbarCallbacks): HTMLElemen
     const has = count > 0;
     pageInfo.textContent = has ? `Page ${state.currentPage.get()} / ${count}` : '';
     zoomLevel.textContent = `${Math.round(state.scale.get() * 100)}%`;
-    for (const el of [zoomOut, zoomIn, addBtn, downloadBtn, formBtn, signBtn]) el.toggleAttribute('disabled', !has);
+    for (const el of [zoomOut, zoomIn, addBtn, addPageBtn, downloadBtn, formBtn, signBtn]) el.toggleAttribute('disabled', !has);
   }
 
   function syncHistory(): void {

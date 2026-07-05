@@ -34,6 +34,7 @@ export function mountApp(root: HTMLElement): void {
   const toolbar = createToolbar(state, {
     onOpen: requestOpen,
     onAddFile: requestAdd,
+    onAddPage: () => state.editor.appendBlank(),
     onDownload: () => void handleDownload(),
     onForm: () => void openFormPanel(state),
     onSign: () => void handleSign(),
@@ -114,10 +115,60 @@ export function mountApp(root: HTMLElement): void {
   });
 
   viewport.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement)?.id === 'empty-open') requestOpen();
+    const id = (e.target as HTMLElement)?.id;
+    if (id === 'empty-open') requestOpen();
+    else if (id === 'empty-blank') {
+      state.currentPage.set(1);
+      state.editor.startBlank();
+      document.title = 'Untitled — pdfforge';
+    } else if (id === 'empty-images') requestImages();
+  });
+
+  const imagesInput = document.createElement('input');
+  imagesInput.type = 'file';
+  imagesInput.accept = 'image/png,image/jpeg';
+  imagesInput.multiple = true;
+  imagesInput.style.display = 'none';
+  shell.appendChild(imagesInput);
+  const requestImages = (): void => imagesInput.click();
+  imagesInput.addEventListener('change', () => {
+    const files = Array.from(imagesInput.files ?? []);
+    imagesInput.value = '';
+    if (files.length) void buildFromImages(files, state);
   });
 
   installShortcuts(state, requestOpen);
+}
+
+async function buildFromImages(files: File[], state: AppState): Promise<void> {
+  const images: Array<{ dataUrl: string; format: 'png' | 'jpg'; wpx: number; hpx: number }> = [];
+  for (const file of files) {
+    const dataUrl = await readAsDataUrl(file);
+    const dims = await imageDims(dataUrl);
+    images.push({ dataUrl, format: file.type === 'image/png' ? 'png' : 'jpg', wpx: dims.w, hpx: dims.h });
+  }
+  if (!images.length) return;
+  state.currentPage.set(1);
+  state.editor.imagesToPdf(images);
+  document.title = 'Images — pdfforge';
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function imageDims(dataUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => resolve({ w: 595, h: 842 });
+    img.src = dataUrl;
+  });
 }
 
 function notify(message: string): void {

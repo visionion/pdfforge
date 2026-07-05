@@ -350,10 +350,20 @@ button.icon {
 .empty-card .small {
   font-size: 13px;
 }
-.empty-card button {
+.empty-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
   margin: 16px 0 6px;
+}
+.empty-card .empty-actions button {
+  margin: 0;
   padding: 11px 22px;
   font-size: 15px;
+}
+.empty-card .empty-actions .ghost {
+  border: 1px solid var(--border);
 }
 
 /* ---------- Drag overlay ---------- */

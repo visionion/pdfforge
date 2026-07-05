@@ -20,7 +20,11 @@ export function createViewport(state: AppState): HTMLElement {
       <h1>pdfforge</h1>
       <p>A powerful PDF editor that runs entirely in your browser.</p>
       <p class="muted">Your files never leave your device — no upload, no signup, no watermark.</p>
-      <button id="empty-open" class="primary">Open a PDF</button>
+      <div class="empty-actions">
+        <button id="empty-open" class="primary">Open a PDF</button>
+        <button id="empty-blank" class="ghost">Start blank</button>
+        <button id="empty-images" class="ghost">Images → PDF</button>
+      </div>
       <p class="muted small">or drop a file anywhere</p>
     </div>`;
 

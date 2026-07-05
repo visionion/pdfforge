@@ -6,6 +6,7 @@ import {
   type PageModel,
   type PageRef,
   modelFromSource,
+  newPageId,
   rotatePage,
   deletePage,
   duplicatePage,
@@ -22,6 +23,7 @@ import {
   updateAnnotation,
   annotationsForPage,
   pagesWithRedactions,
+  newAnnotationId,
 } from '../overlay/annotations';
 
 interface Source {
@@ -56,6 +58,51 @@ export class DocEditor {
 
   hasDoc(): boolean {
     return this.pages.get().length > 0;
+  }
+
+  /** Start a new blank document with a single empty page. */
+  startBlank(width = 595, height = 842): void {
+    this.sources.clear();
+    this.sourceSeq = 0;
+    this.name = 'untitled.pdf';
+    this.commands.clear();
+    this.annotations.set([]);
+    this.pages.set([{ id: newPageId(), rotation: 0, blank: { width, height } }]);
+  }
+
+  /** Append a blank page (build-from-scratch / insert). */
+  appendBlank(width = 595, height = 842): void {
+    this.apply([...this.pages.get(), { id: newPageId(), rotation: 0, blank: { width, height } }], 'Add blank page');
+  }
+
+  /** Build a fresh document from images — one page per image, sized to it. */
+  imagesToPdf(images: Array<{ dataUrl: string; format: 'png' | 'jpg'; wpx: number; hpx: number }>): void {
+    const pages: PageRef[] = [];
+    const anns: Annotation[] = [];
+    for (const img of images) {
+      const width = img.wpx;
+      const height = img.hpx;
+      const id = newPageId();
+      pages.push({ id, rotation: 0, blank: { width, height } });
+      anns.push({
+        id: newAnnotationId(),
+        pageId: id,
+        type: 'image',
+        color: '#000000',
+        x: 0,
+        y: 0,
+        width,
+        height,
+        dataUrl: img.dataUrl,
+        format: img.format,
+      });
+    }
+    this.sources.clear();
+    this.sourceSeq = 0;
+    this.name = 'images.pdf';
+    this.commands.clear();
+    this.annotations.set(anns);
+    this.pages.set(pages);
   }
 
   private register(doc: OpenedDoc): string {
