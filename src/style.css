@@ -280,6 +280,15 @@ button.icon {
   inset: 0;
   z-index: 4;
 }
+.text-edit-input {
+  z-index: 10;
+  outline: 2px solid var(--accent);
+  border-radius: 2px;
+  padding: 0 1px;
+  white-space: pre;
+  font-family: system-ui, sans-serif;
+  box-shadow: 0 2px 8px var(--shadow);
+}
 
 /* ---------- Tool strip ---------- */
 .toolstrip {

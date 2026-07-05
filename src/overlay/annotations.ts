@@ -6,6 +6,7 @@
  */
 export type AnnotationType =
   | 'highlight'
+  | 'whiteout'
   | 'ink'
   | 'rect'
   | 'ellipse'
@@ -21,7 +22,8 @@ interface Base {
 }
 
 export interface RectAnnotation extends Base {
-  readonly type: 'rect' | 'ellipse' | 'highlight';
+  // 'whiteout' is an opaque fill used to cover original content before retyping.
+  readonly type: 'rect' | 'ellipse' | 'highlight' | 'whiteout';
   readonly x: number;
   readonly y: number;
   readonly width: number;

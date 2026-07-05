@@ -8,6 +8,7 @@ interface ToolDef {
 
 const TOOLS: ToolDef[] = [
   { tool: 'select', label: 'Select', title: 'Select & select text' },
+  { tool: 'edit-text', label: 'Edit text', title: 'Edit existing text (whiteout + retype)' },
   { tool: 'highlight', label: 'Highlight', title: 'Highlight' },
   { tool: 'ink', label: 'Draw', title: 'Freehand pen' },
   { tool: 'rect', label: 'Rect', title: 'Rectangle' },

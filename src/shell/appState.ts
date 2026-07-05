@@ -5,6 +5,7 @@ import { DocEditor } from '../doc/editor';
 export type Theme = 'light' | 'dark';
 export type Tool =
   | 'select'
+  | 'edit-text'
   | 'highlight'
   | 'ink'
   | 'rect'

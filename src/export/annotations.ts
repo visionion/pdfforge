@@ -23,6 +23,10 @@ export function drawAnnotation(page: PDFPage, ann: Annotation, font: PDFFont): v
         blendMode: BlendMode.Multiply,
       });
       break;
+    case 'whiteout':
+      // Opaque cover over original content (sampled background color).
+      page.drawRectangle({ x: ann.x, y: ann.y, width: ann.width, height: ann.height, color });
+      break;
     case 'rect':
       if (ann.fill) {
         page.drawRectangle({ x: ann.x, y: ann.y, width: ann.width, height: ann.height, color, opacity: 0.4 });

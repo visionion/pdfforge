@@ -104,6 +104,18 @@ export class DocEditor {
     });
   }
 
+  /** Add several annotations as one undoable command (e.g. whiteout + retyped text). */
+  addAnnotations(annotations: Annotation[], label: string): void {
+    if (annotations.length === 0) return;
+    const prev = this.annotations.get();
+    const next = annotations.reduce<AnnotationModel>((m, a) => addAnnotation(m, a), prev);
+    this.commands.execute({
+      label,
+      apply: () => this.annotations.set(next),
+      invert: () => this.annotations.set(prev),
+    });
+  }
+
   removeAnnotation(id: string): void {
     const prev = this.annotations.get();
     const next = removeAnnotation(prev, id);

@@ -39,6 +39,18 @@ describe('annotation export', () => {
     expect(annotated.length).toBeGreaterThan(plain.length);
   });
 
+  it('draws an opaque whiteout to cover original content', async () => {
+    const sources = new Map([['main', await makeSource()]]);
+    const model = modelFromSource('main', 1);
+    const annotations: Annotation[] = [
+      { id: 'w1', pageId: model[0].id, type: 'whiteout', color: '#ffffff', x: 10, y: 10, width: 50, height: 12, strokeWidth: 0, fill: true },
+      { id: 't1', pageId: model[0].id, type: 'text', color: '#111111', x: 12, y: 12, text: 'replacement', fontSize: 10 },
+    ];
+    const out = await exportPdf(model, sources, { annotations });
+    const reparsed = await PDFDocument.load(out);
+    expect(reparsed.getPageCount()).toBe(1);
+  });
+
   it('only draws annotations for pages that exist in the model', async () => {
     const sources = new Map([['main', await makeSource()]]);
     const model = modelFromSource('main', 1);

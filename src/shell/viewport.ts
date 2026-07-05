@@ -2,6 +2,7 @@ import type { AppState } from './appState';
 import type { PageRef } from '../doc/ops';
 import { renderPageToCanvas, buildTextLayer, renderBlankCanvas } from '../render/pdfjs';
 import { PageOverlay } from '../overlay/konvaLayer';
+import { attachTextEdit } from '../features/text-edit/editText';
 
 /**
  * The scrollable page area. Re-renders from the page model whenever the model
@@ -114,10 +115,11 @@ async function renderInto(
     /* selection layer is best-effort */
   });
 
-  // Annotation overlay — unrotated pages only (coords are authored in
+  // Annotation + text-edit — unrotated pages only (coords are authored in
   // unrotated PDF space; per-page rotation would need a coordinate transform).
   if (ref.rotation !== 0) return null;
   const vp1 = page.getViewport({ scale: 1 });
+  attachTextEdit(pageEl, canvas, textLayer, state, ref.id, vp1.height);
   const overlayEl = makeOverlayEl(pageEl);
   return new PageOverlay(overlayEl, state, ref.id, vp1.height, vp1.width * scale, vp1.height * scale);
 }

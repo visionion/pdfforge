@@ -74,8 +74,10 @@ export class PageOverlay {
     const h = this.pageHeightPts;
     switch (ann.type) {
       case 'highlight':
+      case 'whiteout':
       case 'rect': {
         const p = pdfToScreen(ann.x, ann.y + ann.height, h, s);
+        const filled = ann.type === 'highlight' || ann.type === 'whiteout' || ann.fill;
         return new Konva.Rect({
           x: p.x,
           y: p.y,
@@ -83,8 +85,8 @@ export class PageOverlay {
           height: ann.height * s,
           stroke: ann.type === 'rect' && !ann.fill ? ann.color : undefined,
           strokeWidth: ann.strokeWidth,
-          fill: ann.type === 'highlight' || ann.fill ? ann.color : undefined,
-          opacity: ann.type === 'highlight' ? 0.4 : ann.fill ? 0.4 : 1,
+          fill: filled ? ann.color : undefined,
+          opacity: ann.type === 'highlight' ? 0.4 : ann.type === 'whiteout' ? 1 : ann.fill ? 0.4 : 1,
           listening: false,
         });
       }
