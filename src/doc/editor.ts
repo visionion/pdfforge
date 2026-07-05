@@ -261,6 +261,10 @@ export class DocEditor {
   }
 
   exportName(): string {
-    return `${this.name.replace(/\.pdf$/i, '')}-edited.pdf`;
+    return `${this.baseName()}-edited.pdf`;
+  }
+
+  baseName(): string {
+    return this.name.replace(/\.pdf$/i, '') || 'document';
   }
 }

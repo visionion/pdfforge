@@ -382,6 +382,33 @@ button.icon {
   backdrop-filter: blur(2px);
 }
 
+/* ---------- Tools dropdown ---------- */
+.tools-menu {
+  position: relative;
+  display: inline-block;
+}
+.tools-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px var(--shadow);
+  padding: 6px;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+}
+.tools-item {
+  background: transparent;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
 /* ---------- Modal / form panel ---------- */
 .modal-backdrop {
   position: fixed;

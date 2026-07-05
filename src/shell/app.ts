@@ -2,6 +2,7 @@ import { AppState } from './appState';
 import { createToolbar } from './toolbar';
 import { createToolStrip } from './toolstrip';
 import { openFormPanel } from './formPanel';
+import { openConvertPanel } from './convertPanel';
 import { openSignatureDialog } from '../features/sign/signatureDialog';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
@@ -36,8 +37,11 @@ export function mountApp(root: HTMLElement): void {
     onAddFile: requestAdd,
     onAddPage: () => state.editor.appendBlank(),
     onDownload: () => void handleDownload(),
-    onForm: () => void openFormPanel(state),
-    onSign: () => void handleSign(),
+    tools: {
+      onForm: () => void openFormPanel(state),
+      onSign: () => void handleSign(),
+      onImages: () => openConvertPanel(state),
+    },
   });
 
   async function handleSign(): Promise<void> {

@@ -111,6 +111,31 @@ interface RasterResult {
   heightPts: number;
 }
 
+/** Render a page to an image Blob at an exact scale (no device-pixel scaling). */
+export async function pageToImageBlob(
+  page: PDFPageProxy,
+  scale: number,
+  rotation: number,
+  mime: 'image/png' | 'image/jpeg',
+  quality = 0.92,
+): Promise<Blob> {
+  const viewport = page.getViewport({ scale, rotation: normalizedRotation(page, rotation) });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  if (mime === 'image/jpeg') {
+    const c = canvas.getContext('2d');
+    if (c) {
+      c.fillStyle = '#ffffff';
+      c.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+  await enqueueRender(() => page.render({ canvas, viewport }).promise);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), mime, quality);
+  });
+}
+
 /**
  * Render a page to a PNG raster at the given scale, baking opaque black boxes
  * over the redaction rects (in PDF points) so covered content is destroyed.
