@@ -3,6 +3,16 @@ import { CommandStack } from '../store/commandStack';
 import { DocEditor } from '../doc/editor';
 
 export type Theme = 'light' | 'dark';
+export type Tool =
+  | 'select'
+  | 'highlight'
+  | 'ink'
+  | 'rect'
+  | 'ellipse'
+  | 'line'
+  | 'arrow'
+  | 'text'
+  | 'note';
 
 /**
  * Shared application state. A single instance is created at bootstrap and passed
@@ -14,6 +24,8 @@ export class AppState {
   readonly theme = new Signal<Theme>(readInitialTheme());
   readonly commands = new CommandStack();
   readonly editor = new DocEditor(this.commands);
+  readonly activeTool = new Signal<Tool>('select');
+  readonly toolColor = new Signal<string>('#e5393a');
 
   readonly minScale = 0.25;
   readonly maxScale = 4;

@@ -1,5 +1,6 @@
 import { AppState } from './appState';
 import { createToolbar } from './toolbar';
+import { createToolStrip } from './toolstrip';
 import { createSidebar } from './sidebar';
 import { createViewport } from './viewport';
 import { installShortcuts } from './shortcuts';
@@ -34,13 +35,15 @@ export function mountApp(root: HTMLElement): void {
     onDownload: () => void handleDownload(),
   });
 
+  const toolstrip = createToolStrip(state);
+
   const body = document.createElement('div');
   body.className = 'app-body';
   body.append(sidebar, viewport);
 
   const shell = document.createElement('div');
   shell.className = 'app-shell';
-  shell.append(toolbar, body, fileInput);
+  shell.append(toolbar, toolstrip, body, fileInput);
   root.appendChild(shell);
 
   async function handleFile(file: File, how: 'open' | 'add'): Promise<void> {

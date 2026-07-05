@@ -233,7 +233,7 @@ button.icon {
   position: absolute;
   top: 8px;
   right: 8px;
-  z-index: 3;
+  z-index: 5;
   display: flex;
   gap: 4px;
   opacity: 0;
@@ -273,6 +273,45 @@ button.icon {
 }
 .text-layer span::selection {
   background: rgba(99, 102, 241, 0.4);
+}
+
+.konva-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+}
+
+/* ---------- Tool strip ---------- */
+.toolstrip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+  overflow-x: auto;
+}
+.toolstrip .tool {
+  background: transparent;
+  padding: 5px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.toolstrip .tool.active {
+  background: var(--accent);
+  color: #fff;
+}
+.tool-color {
+  width: 32px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  cursor: pointer;
+  margin-left: 4px;
 }
 
 /* ---------- Empty state ---------- */

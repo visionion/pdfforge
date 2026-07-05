@@ -1,6 +1,7 @@
 import type { AppState } from './appState';
 import type { PageRef } from '../doc/ops';
 import { renderPageToCanvas, buildTextLayer, renderBlankCanvas } from '../render/pdfjs';
+import { PageOverlay } from '../overlay/konvaLayer';
 
 /**
  * The scrollable page area. Re-renders from the page model whenever the model
@@ -27,9 +28,12 @@ export function createViewport(state: AppState): HTMLElement {
   root.append(empty, pages);
 
   let renderToken = 0;
+  let overlays: PageOverlay[] = [];
 
   async function render(): Promise<void> {
     const token = ++renderToken;
+    for (const o of overlays) o.destroy();
+    overlays = [];
     const model = state.editor.pages.get();
     pages.textContent = '';
     empty.style.display = model.length > 0 ? 'none' : 'grid';
@@ -42,7 +46,8 @@ export function createViewport(state: AppState): HTMLElement {
       const pageEl = buildPageShell(state, i, model.length);
       pages.appendChild(pageEl);
       try {
-        await renderInto(state, ref, scale, pageEl, token, () => renderToken);
+        const overlay = await renderInto(state, ref, scale, pageEl, token, () => renderToken);
+        if (overlay) overlays.push(overlay);
       } catch {
         pageEl.classList.add('page-error');
       }
@@ -89,14 +94,15 @@ async function renderInto(
   pageEl: HTMLElement,
   token: number,
   currentToken: () => number,
-): Promise<void> {
+): Promise<PageOverlay | null> {
   if (ref.blank) {
     const canvas = renderBlankCanvas(ref.blank.width, ref.blank.height, scale);
     pageEl.appendChild(canvas);
-    return;
+    const overlayEl = makeOverlayEl(pageEl);
+    return new PageOverlay(overlayEl, state, ref.id, ref.blank.height, ref.blank.width * scale, ref.blank.height * scale);
   }
   const page = await state.editor.renderPage(ref);
-  if (token !== currentToken() || !page) return;
+  if (token !== currentToken() || !page) return null;
 
   const canvas = document.createElement('canvas');
   const textLayer = document.createElement('div');
@@ -107,6 +113,20 @@ async function renderInto(
   buildTextLayer(page, textLayer, scale, ref.rotation).catch(() => {
     /* selection layer is best-effort */
   });
+
+  // Annotation overlay — unrotated pages only (coords are authored in
+  // unrotated PDF space; per-page rotation would need a coordinate transform).
+  if (ref.rotation !== 0) return null;
+  const vp1 = page.getViewport({ scale: 1 });
+  const overlayEl = makeOverlayEl(pageEl);
+  return new PageOverlay(overlayEl, state, ref.id, vp1.height, vp1.width * scale, vp1.height * scale);
+}
+
+function makeOverlayEl(pageEl: HTMLElement): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'konva-overlay';
+  pageEl.appendChild(el);
+  return el;
 }
 
 function ctrlBtn(label: string, title: string, onClick: () => void, disabled = false): HTMLButtonElement {
