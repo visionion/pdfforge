@@ -20,8 +20,8 @@ dist-ssr/
 public/pdfjs/
 
 # Local verification scratch
-public/__sample.pdf
-gen-sample.mjs
+public/__*.pdf
+gen-*.mjs
 
 # Test / coverage
 coverage/
