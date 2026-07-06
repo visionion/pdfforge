@@ -72,19 +72,41 @@ function openEditor(
     input.remove();
     if (text === original.trim()) return; // no change → no annotations
 
-    const fontSizePdf = (h * 0.82) / scale;
-    const whiteoutBL = screenToPdf(left - 2, top + h, pageHeightPts, scale);
-    const textBaseline = screenToPdf(left, top + h * 0.82, pageHeightPts, scale);
+    // Prefer pdf.js's exact text-item geometry (PDF points) captured on the span
+    // for pixel-accurate coverage; fall back to the DOM span rect if absent.
+    const geom = pdfGeometry(span);
+    let woX: number, woY: number, woW: number, woH: number, tx: number, ty: number, size: number;
+    if (geom) {
+      const pad = geom.ph * 0.3; // cover descenders below the baseline
+      woX = geom.px - 1;
+      woY = geom.py - pad;
+      woW = geom.pw + 2;
+      woH = geom.ph + pad * 1.5; // and ascenders above
+      tx = geom.px;
+      ty = geom.py;
+      size = geom.ph;
+    } else {
+      const bl = screenToPdf(left - 2, top + h, pageHeightPts, scale);
+      const tb = screenToPdf(left, top + h * 0.82, pageHeightPts, scale);
+      woX = bl.x;
+      woY = bl.y;
+      woW = (w + 4) / scale;
+      woH = h / scale;
+      tx = tb.x;
+      ty = tb.y;
+      size = (h * 0.82) / scale;
+    }
+
     const anns: Annotation[] = [
       {
         id: newAnnotationId(),
         pageId,
         type: 'whiteout',
         color: bg,
-        x: whiteoutBL.x,
-        y: whiteoutBL.y,
-        width: (w + 4) / scale,
-        height: h / scale,
+        x: woX,
+        y: woY,
+        width: woW,
+        height: woH,
         strokeWidth: 0,
         fill: true,
       },
@@ -95,10 +117,10 @@ function openEditor(
         pageId,
         type: 'text',
         color: '#111111',
-        x: textBaseline.x,
-        y: textBaseline.y,
+        x: tx,
+        y: ty,
         text,
-        fontSize: fontSizePdf,
+        fontSize: size,
       });
     }
     state.editor.addAnnotations(anns, 'Edit text');
@@ -114,6 +136,16 @@ function openEditor(
     }
   });
   input.addEventListener('blur', commit);
+}
+
+/** Read the exact pdf.js text-item geometry (PDF points) stashed on the span. */
+function pdfGeometry(span: HTMLElement): { px: number; py: number; pw: number; ph: number } | null {
+  const px = Number(span.dataset.px);
+  const py = Number(span.dataset.py);
+  const pw = Number(span.dataset.pw);
+  const ph = Number(span.dataset.ph);
+  if ([px, py, pw, ph].some((n) => !Number.isFinite(n)) || pw <= 0 || ph <= 0) return null;
+  return { px, py, pw, ph };
 }
 
 /** Sample the page background near a text run to match the whiteout fill. */

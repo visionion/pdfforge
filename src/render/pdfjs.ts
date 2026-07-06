@@ -86,6 +86,12 @@ export async function buildTextLayer(
     span.style.top = `${tx[5] - fontHeight}px`;
     span.style.fontSize = `${fontHeight}px`;
     span.style.fontFamily = item.fontName;
+    // Exact PDF-point geometry (unscaled), for pixel-accurate text editing:
+    // baseline origin (px, py), advance width (pw), font size (ph).
+    span.dataset.px = String(item.transform[4]);
+    span.dataset.py = String(item.transform[5]);
+    span.dataset.pw = String(item.width);
+    span.dataset.ph = String(Math.hypot(item.transform[2], item.transform[3]) || item.height);
     frag.appendChild(span);
   }
 
