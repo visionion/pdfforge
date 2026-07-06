@@ -28,13 +28,24 @@ export function createToolStrip(state: AppState): HTMLElement {
   const root = document.createElement('div');
   root.className = 'toolstrip';
 
+  const DEFAULT_COLOR = '#e5393a';
+  const HIGHLIGHT_COLOR = '#ffeb3b';
+  const colorTools: Tool[] = ['ink', 'rect', 'ellipse', 'line', 'arrow', 'text', 'note'];
+
   const buttons = new Map<Tool, HTMLButtonElement>();
   for (const def of TOOLS) {
     const btn = document.createElement('button');
     btn.className = 'tool';
     btn.textContent = def.label;
     btn.title = def.title;
-    btn.addEventListener('click', () => state.activeTool.set(def.tool));
+    btn.addEventListener('click', () => {
+      // Highlights default to yellow; other draw tools default to red. Manual
+      // (non-default) colors are preserved when switching tools.
+      const cur = state.toolColor.get();
+      if (def.tool === 'highlight' && cur === DEFAULT_COLOR) state.toolColor.set(HIGHLIGHT_COLOR);
+      else if (colorTools.includes(def.tool) && cur === HIGHLIGHT_COLOR) state.toolColor.set(DEFAULT_COLOR);
+      state.activeTool.set(def.tool);
+    });
     buttons.set(def.tool, btn);
     root.appendChild(btn);
   }
@@ -45,6 +56,7 @@ export function createToolStrip(state: AppState): HTMLElement {
   color.value = state.toolColor.get();
   color.title = 'Annotation color';
   color.addEventListener('input', () => state.toolColor.set(color.value));
+  state.toolColor.subscribe((v) => (color.value = v));
   root.appendChild(color);
 
   function sync(): void {

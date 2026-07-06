@@ -128,7 +128,8 @@ export function mountApp(root: HTMLElement): void {
     e.preventDefault();
     shell.classList.remove('dragging');
     const file = e.dataTransfer?.files?.[0];
-    if (file) void handleFile(file, state.editor.hasDoc() ? 'add' : 'open');
+    // Dragging a file opens it (replaces); use "Add PDF" to merge into the current doc.
+    if (file) void handleFile(file, 'open');
   });
 
   viewport.addEventListener('click', (e) => {
