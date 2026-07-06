@@ -9,7 +9,12 @@ export function installShortcuts(state: AppState, requestOpen: () => void): void
     if (isEditableTarget(e.target)) return;
     const mod = e.metaKey || e.ctrlKey;
 
-    if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedAnnotationId.get()) {
+      e.preventDefault();
+      const id = state.selectedAnnotationId.get();
+      if (id) state.editor.removeAnnotation(id);
+      state.selectedAnnotationId.set(null);
+    } else if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
       e.preventDefault();
       state.commands.undo();
     } else if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {

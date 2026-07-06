@@ -183,6 +183,27 @@ export class DocEditor {
     const prev = this.annotations.get();
     const next = updateAnnotation(prev, id, geo as Partial<Annotation>);
     this.commands.execute({
+      label: 'Resize object',
+      apply: () => this.annotations.set(next),
+      invert: () => this.annotations.set(prev),
+    });
+  }
+
+  /** Translate any annotation type by a delta (PDF points) as an undoable command. */
+  moveAnnotationBy(id: string, dx: number, dy: number): void {
+    if (dx === 0 && dy === 0) return;
+    const prev = this.annotations.get();
+    const next = prev.map((a): Annotation => {
+      if (a.id !== id) return a;
+      if ('x1' in a) {
+        return { ...a, x1: a.x1 + dx, y1: a.y1 + dy, x2: a.x2 + dx, y2: a.y2 + dy };
+      }
+      if ('points' in a) {
+        return { ...a, points: a.points.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)) };
+      }
+      return { ...a, x: a.x + dx, y: a.y + dy };
+    });
+    this.commands.execute({
       label: 'Move object',
       apply: () => this.annotations.set(next),
       invert: () => this.annotations.set(prev),
