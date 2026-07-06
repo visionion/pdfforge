@@ -2,6 +2,8 @@ import type { AppState } from './appState';
 import type { PageRef } from '../doc/ops';
 import { renderThumbnail, renderBlankCanvas } from '../render/pdfjs';
 import { scrollToPage } from './viewport';
+import { annotationsForPage } from '../overlay/annotations';
+import { drawAnnotations2D } from '../overlay/draw2d';
 
 /**
  * Thumbnail sidebar rendered lazily from the page model. Clicking scrolls the
@@ -93,6 +95,14 @@ export function createSidebar(state: AppState, viewport: HTMLElement): HTMLEleme
   state.editor.pages.subscribe(() => render());
   state.currentPage.subscribe((n) => highlight(n));
 
+  // Re-paint thumbnails when annotations change (debounced so it doesn't thrash
+  // while drawing). Only the currently-visible thumbnails re-render (lazy).
+  let annTimer: ReturnType<typeof setTimeout> | undefined;
+  state.editor.annotations.subscribe(() => {
+    clearTimeout(annTimer);
+    annTimer = setTimeout(() => render(), 250);
+  });
+
   return root;
 }
 
@@ -104,13 +114,31 @@ async function paintThumb(
   currentToken: () => number,
 ): Promise<void> {
   let canvas: HTMLCanvasElement;
+  let widthPts: number;
+  let heightPts: number;
   if (ref.blank) {
-    canvas = renderBlankCanvas(ref.blank.width, ref.blank.height, 140 / ref.blank.width);
+    widthPts = ref.blank.width;
+    heightPts = ref.blank.height;
+    canvas = renderBlankCanvas(widthPts, heightPts, 140 / widthPts);
   } else {
     const page = await state.editor.renderPage(ref);
     if (token !== currentToken() || !page) return;
+    const vp1 = page.getViewport({ scale: 1 });
+    widthPts = vp1.width;
+    heightPts = vp1.height;
     canvas = await renderThumbnail(page, 140, ref.rotation);
   }
   if (token !== currentToken()) return;
+
+  // Overlay this page's annotations onto the thumbnail (unrotated pages only).
+  const anns = annotationsForPage(state.editor.annotations.get(), ref.id);
+  if (anns.length && ref.rotation === 0) {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const cssScale = 140 / widthPts;
+      const dpr = canvas.width / (parseFloat(canvas.style.width) || 140);
+      drawAnnotations2D(ctx, anns, cssScale, heightPts, dpr);
+    }
+  }
   item.insertBefore(canvas, item.firstChild);
 }

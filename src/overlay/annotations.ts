@@ -76,6 +76,8 @@ export interface TextAnnotation extends Base {
   readonly y: number;
   readonly text: string;
   readonly fontSize: number;
+  /** When set, text wraps to this width (PDF points) instead of overflowing. */
+  readonly maxWidth?: number;
 }
 
 export type Annotation =

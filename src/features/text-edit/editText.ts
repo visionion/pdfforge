@@ -181,6 +181,7 @@ function openEditor(
         y: maxBaseline,
         text,
         fontSize: avgH,
+        maxWidth: Math.max(avgH * 4, maxX - minX), // wrap within the selected region
       });
     }
     state.editor.addAnnotations(anns, 'Edit text');

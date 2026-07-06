@@ -75,7 +75,14 @@ export async function drawAnnotation(
       }
       break;
     case 'text':
-      page.drawText(ann.text, { x: ann.x, y: ann.y, size: ann.fontSize, font, color });
+      page.drawText(ann.text, {
+        x: ann.x,
+        y: ann.y,
+        size: ann.fontSize,
+        font,
+        color,
+        ...(ann.maxWidth ? { maxWidth: ann.maxWidth, lineHeight: ann.fontSize * 1.15 } : {}),
+      });
       break;
     case 'note':
       page.drawRectangle({ x: ann.x, y: ann.y - ann.fontSize, width: ann.fontSize, height: ann.fontSize, color });

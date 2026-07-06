@@ -225,6 +225,7 @@ export class PageOverlay {
           text: ann.text,
           fontSize: ann.fontSize * s,
           fill: ann.type === 'note' ? '#1a1a1a' : ann.color,
+          ...(ann.type === 'text' && ann.maxWidth ? { width: ann.maxWidth * s, lineHeight: 1.15 } : {}),
         });
       }
       case 'link': {
