@@ -29,6 +29,13 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute must always win over author `display` rules
+   (e.g. the Tools dropdown sets `display: flex`, which would otherwise
+   keep it visible even when hidden). */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
