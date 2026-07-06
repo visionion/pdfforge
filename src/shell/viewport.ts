@@ -165,7 +165,7 @@ async function renderInto(
 
   if (ref.rotation !== 0) return null; // annotations author in unrotated space only
   const vp1 = page.getViewport({ scale: 1 });
-  attachTextEdit(pageEl, canvas, textLayer, state, ref.id, vp1.height);
+  attachTextEdit(pageEl, canvas, textLayer, state, ref.id);
   const Ctor = await ensureOverlayCtor();
   return new Ctor(makeOverlayEl(pageEl), state, ref.id, vp1.height, vp1.width * scale, vp1.height * scale);
 }

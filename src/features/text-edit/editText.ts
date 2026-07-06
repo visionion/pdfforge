@@ -1,14 +1,21 @@
 import type { AppState } from '../../shell/appState';
 import type { Annotation } from '../../overlay/annotations';
 import { newAnnotationId } from '../../overlay/annotations';
-import { screenToPdf } from '../../overlay/coords';
+
+interface Geom {
+  px: number;
+  py: number;
+  pw: number;
+  ph: number;
+}
 
 /**
- * Wire click-to-edit on a page's text layer. When the 'edit-text' tool is
- * active, clicking a text run opens an inline editor seeded with the original
- * text; committing draws an opaque whiteout over the original (sampled to the
- * page background) and retypes the new text — the client-side "edit existing
- * text" approach, since true in-place reflow isn't feasible in the browser.
+ * Wire click / drag text editing on a page's text layer. With the 'edit-text'
+ * tool: clicking a text run selects and edits its whole line; dragging selects
+ * an arbitrary region of text. The selected text is covered with an opaque
+ * whiteout (sampled to the page background) and retyped — the client-side "edit
+ * existing text" approach, since true in-place reflow isn't feasible in-browser.
+ * Coverage uses pdf.js's exact text-item geometry for pixel-accurate results.
  */
 export function attachTextEdit(
   pageEl: HTMLElement,
@@ -16,97 +23,150 @@ export function attachTextEdit(
   textLayer: HTMLElement,
   state: AppState,
   pageId: string,
-  pageHeightPts: number,
 ): void {
-  textLayer.addEventListener('click', (e) => {
+  let sel: { x0: number; y0: number; moved: boolean; rect: HTMLDivElement | null } | null = null;
+  const rel = (e: MouseEvent): { x: number; y: number } => {
+    const pr = pageEl.getBoundingClientRect();
+    return { x: e.clientX - pr.left, y: e.clientY - pr.top };
+  };
+
+  pageEl.addEventListener('mousedown', (e) => {
     if (state.activeTool.get() !== 'edit-text') return;
-    const span = e.target as HTMLElement;
-    if (span.tagName !== 'SPAN') return;
-    e.preventDefault();
-    e.stopPropagation();
-    openEditor(pageEl, canvas, span, state, pageId, pageHeightPts);
+    if ((e.target as HTMLElement).closest('.text-edit-input')) return;
+    const p = rel(e);
+    sel = { x0: p.x, y0: p.y, moved: false, rect: null };
   });
+
+  pageEl.addEventListener('mousemove', (e) => {
+    if (!sel) return;
+    const p = rel(e);
+    if (Math.abs(p.x - sel.x0) > 3 || Math.abs(p.y - sel.y0) > 3) sel.moved = true;
+    if (!sel.moved) return;
+    if (!sel.rect) {
+      sel.rect = document.createElement('div');
+      sel.rect.className = 'text-select-rect';
+      pageEl.appendChild(sel.rect);
+    }
+    Object.assign(sel.rect.style, {
+      left: `${Math.min(p.x, sel.x0)}px`,
+      top: `${Math.min(p.y, sel.y0)}px`,
+      width: `${Math.abs(p.x - sel.x0)}px`,
+      height: `${Math.abs(p.y - sel.y0)}px`,
+    });
+  });
+
+  pageEl.addEventListener('mouseup', (e) => {
+    if (!sel) return;
+    const cur = sel;
+    sel = null;
+    cur.rect?.remove();
+    const spans = [...textLayer.querySelectorAll<HTMLElement>('span')];
+    let chosen: HTMLElement[];
+    if (cur.moved) {
+      const p = rel(e);
+      const box = { left: Math.min(p.x, cur.x0), top: Math.min(p.y, cur.y0), right: Math.max(p.x, cur.x0), bottom: Math.max(p.y, cur.y0) };
+      chosen = spans.filter((s) => intersects(s, pageEl, box));
+    } else {
+      const target = e.target as HTMLElement;
+      if (target.tagName !== 'SPAN') return;
+      chosen = sameLine(spans, target);
+    }
+    if (chosen.length) openEditor(pageEl, canvas, chosen, state, pageId);
+  });
+}
+
+/** All spans on the same text baseline as the clicked one (a "line"). */
+function sameLine(spans: HTMLElement[], target: HTMLElement): HTMLElement[] {
+  const g = pdfGeometry(target);
+  if (!g) return [target];
+  const line = spans.filter((s) => {
+    const sg = pdfGeometry(s);
+    return sg && Math.abs(sg.py - g.py) < g.ph * 0.6;
+  });
+  return line.length ? line : [target];
+}
+
+function intersects(span: HTMLElement, pageEl: HTMLElement, box: { left: number; top: number; right: number; bottom: number }): boolean {
+  const pr = pageEl.getBoundingClientRect();
+  const sr = span.getBoundingClientRect();
+  const l = sr.left - pr.left;
+  const t = sr.top - pr.top;
+  return l < box.right && l + sr.width > box.left && t < box.bottom && t + sr.height > box.top;
 }
 
 function openEditor(
   pageEl: HTMLElement,
   canvas: HTMLCanvasElement,
-  span: HTMLElement,
+  spans: HTMLElement[],
   state: AppState,
   pageId: string,
-  pageHeightPts: number,
 ): void {
   const scale = state.scale.get();
-  const pr = pageEl.getBoundingClientRect();
-  const sr = span.getBoundingClientRect();
-  const left = sr.left - pr.left;
-  const top = sr.top - pr.top;
-  const w = sr.width;
-  const h = sr.height;
-  const original = span.textContent ?? '';
-  const bg = sampleBackground(canvas, left, top, w);
+  const geoms = spans.map(pdfGeometry).filter((g): g is Geom => g !== null);
+  if (!geoms.length) return;
 
-  const input = document.createElement('div');
-  input.contentEditable = 'true';
+  // Reading order: top line first (higher py in PDF space), then left-to-right.
+  const ordered = spans
+    .map((s) => ({ s, g: pdfGeometry(s) }))
+    .filter((o): o is { s: HTMLElement; g: Geom } => o.g !== null)
+    .sort((a, b) => (Math.abs(a.g.py - b.g.py) > 2 ? b.g.py - a.g.py : a.g.px - b.g.px));
+  const original = ordered.map((o) => o.s.textContent ?? '').join(' ').replace(/\s+/g, ' ').trim();
+
+  const minX = Math.min(...geoms.map((g) => g.px));
+  const maxX = Math.max(...geoms.map((g) => g.px + g.pw));
+  const minBaseline = Math.min(...geoms.map((g) => g.py));
+  const maxBaseline = Math.max(...geoms.map((g) => g.py));
+  const avgH = geoms.reduce((s, g) => s + g.ph, 0) / geoms.length;
+
+  // Screen rect (relative to page) for positioning the inline editor.
+  const pr = pageEl.getBoundingClientRect();
+  let sl = Infinity, st = Infinity, sr = -Infinity, sb = -Infinity;
+  for (const s of spans) {
+    const r = s.getBoundingClientRect();
+    sl = Math.min(sl, r.left - pr.left);
+    st = Math.min(st, r.top - pr.top);
+    sr = Math.max(sr, r.right - pr.left);
+    sb = Math.max(sb, r.bottom - pr.top);
+  }
+  const bg = sampleBackground(canvas, sl, st, sr - sl);
+
+  const input = document.createElement('textarea');
   input.className = 'text-edit-input';
-  input.textContent = original;
+  input.value = original;
   Object.assign(input.style, {
     position: 'absolute',
-    left: `${left - 2}px`,
-    top: `${top - 1}px`,
-    minWidth: `${w}px`,
-    fontSize: span.style.fontSize || `${h * 0.85}px`,
-    lineHeight: `${h}px`,
+    left: `${sl - 2}px`,
+    top: `${st - 1}px`,
+    width: `${Math.max(60, sr - sl + 6)}px`,
+    height: `${Math.max(avgH * scale * 1.4, sb - st + 4)}px`,
+    fontSize: `${avgH * scale}px`,
+    lineHeight: `${avgH * scale * 1.15}px`,
     background: bg,
     color: '#111',
   });
   pageEl.appendChild(input);
   input.focus();
-  selectAll(input);
+  input.select();
 
   let done = false;
   const commit = (): void => {
     if (done) return;
     done = true;
-    const text = (input.textContent ?? '').trim();
+    const text = input.value.trim();
     input.remove();
-    if (text === original.trim()) return; // no change → no annotations
+    if (text === original) return;
 
-    // Prefer pdf.js's exact text-item geometry (PDF points) captured on the span
-    // for pixel-accurate coverage; fall back to the DOM span rect if absent.
-    const geom = pdfGeometry(span);
-    let woX: number, woY: number, woW: number, woH: number, tx: number, ty: number, size: number;
-    if (geom) {
-      const pad = geom.ph * 0.3; // cover descenders below the baseline
-      woX = geom.px - 1;
-      woY = geom.py - pad;
-      woW = geom.pw + 2;
-      woH = geom.ph + pad * 1.5; // and ascenders above
-      tx = geom.px;
-      ty = geom.py;
-      size = geom.ph;
-    } else {
-      const bl = screenToPdf(left - 2, top + h, pageHeightPts, scale);
-      const tb = screenToPdf(left, top + h * 0.82, pageHeightPts, scale);
-      woX = bl.x;
-      woY = bl.y;
-      woW = (w + 4) / scale;
-      woH = h / scale;
-      tx = tb.x;
-      ty = tb.y;
-      size = (h * 0.82) / scale;
-    }
-
+    const pad = avgH * 0.3;
     const anns: Annotation[] = [
       {
         id: newAnnotationId(),
         pageId,
         type: 'whiteout',
         color: bg,
-        x: woX,
-        y: woY,
-        width: woW,
-        height: woH,
+        x: minX - 1,
+        y: minBaseline - pad,
+        width: maxX - minX + 2,
+        height: maxBaseline - minBaseline + avgH + pad * 1.5,
         strokeWidth: 0,
         fill: true,
       },
@@ -117,10 +177,10 @@ function openEditor(
         pageId,
         type: 'text',
         color: '#111111',
-        x: tx,
-        y: ty,
+        x: minX,
+        y: maxBaseline,
         text,
-        fontSize: size,
+        fontSize: avgH,
       });
     }
     state.editor.addAnnotations(anns, 'Edit text');
@@ -139,7 +199,7 @@ function openEditor(
 }
 
 /** Read the exact pdf.js text-item geometry (PDF points) stashed on the span. */
-function pdfGeometry(span: HTMLElement): { px: number; py: number; pw: number; ph: number } | null {
+function pdfGeometry(span: HTMLElement): Geom | null {
   const px = Number(span.dataset.px);
   const py = Number(span.dataset.py);
   const pw = Number(span.dataset.pw);
@@ -163,12 +223,4 @@ function sampleBackground(canvas: HTMLCanvasElement, left: number, top: number, 
   } catch {
     return '#ffffff';
   }
-}
-
-function selectAll(el: HTMLElement): void {
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  const sel = window.getSelection();
-  sel?.removeAllRanges();
-  sel?.addRange(range);
 }

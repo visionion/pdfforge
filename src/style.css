@@ -291,11 +291,21 @@ button.icon {
 .text-edit-input {
   z-index: 10;
   outline: 2px solid var(--accent);
+  border: none;
   border-radius: 2px;
-  padding: 0 1px;
-  white-space: pre;
+  padding: 0 2px;
+  margin: 0;
+  resize: none;
+  overflow: hidden;
   font-family: system-ui, sans-serif;
   box-shadow: 0 2px 8px var(--shadow);
+}
+.text-select-rect {
+  position: absolute;
+  z-index: 9;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid var(--accent);
+  pointer-events: none;
 }
 
 /* ---------- Tool strip ---------- */
