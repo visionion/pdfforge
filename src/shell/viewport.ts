@@ -90,7 +90,16 @@ export function createViewport(state: AppState): HTMLElement {
       shell.style.width = `${Math.floor(dims.w * scale)}px`;
       shell.style.height = `${Math.floor(dims.h * scale)}px`;
       pages.appendChild(shell);
-      observer.observe(shell);
+      // Eagerly render anything near the current scroll position — the
+      // IntersectionObserver only handles pages scrolled into view later.
+      // (IO delivery can be deferred in background tabs; first paint must
+      // never depend on it.)
+      if (shell.offsetTop < root.scrollTop + root.clientHeight + 600 && !shell.dataset.rendered) {
+        shell.dataset.rendered = '1';
+        void renderShell(shell);
+      } else {
+        observer.observe(shell);
+      }
     }
   }
 

@@ -75,15 +75,29 @@ export function attachTextEdit(
   });
 }
 
-/** All spans on the same text baseline as the clicked one (a "line"). */
+/**
+ * All spans on the same text baseline as the clicked one (a "line"), limited to
+ * the horizontally-contiguous cluster containing the click. In multi-column
+ * documents two columns share a baseline; without the cluster step a click
+ * would select across both columns.
+ */
 function sameLine(spans: HTMLElement[], target: HTMLElement): HTMLElement[] {
   const g = pdfGeometry(target);
   if (!g) return [target];
-  const line = spans.filter((s) => {
-    const sg = pdfGeometry(s);
-    return sg && Math.abs(sg.py - g.py) < g.ph * 0.6;
-  });
-  return line.length ? line : [target];
+  const line = spans
+    .map((s) => ({ s, g: pdfGeometry(s) }))
+    .filter((o): o is { s: HTMLElement; g: Geom } => o.g !== null && Math.abs(o.g.py - g.py) < g.ph * 0.6)
+    .sort((a, b) => a.g.px - b.g.px);
+  if (!line.length) return [target];
+
+  const maxGap = g.ph * 2.5; // gaps wider than ~2.5em mean a column break
+  const idx = line.findIndex((o) => o.s === target);
+  if (idx === -1) return line.map((o) => o.s);
+  let start = idx;
+  while (start > 0 && line[start].g.px - (line[start - 1].g.px + line[start - 1].g.pw) < maxGap) start--;
+  let end = idx;
+  while (end < line.length - 1 && line[end + 1].g.px - (line[end].g.px + line[end].g.pw) < maxGap) end++;
+  return line.slice(start, end + 1).map((o) => o.s);
 }
 
 function intersects(span: HTMLElement, pageEl: HTMLElement, box: { left: number; top: number; right: number; bottom: number }): boolean {
@@ -172,6 +186,9 @@ function openEditor(
       },
     ];
     if (text.length > 0) {
+      // Wrap only when the selection itself spans multiple lines; a single-line
+      // edit should never wrap a short word onto a second line.
+      const multiLine = maxBaseline - minBaseline > avgH * 0.6;
       anns.push({
         id: newAnnotationId(),
         pageId,
@@ -181,7 +198,7 @@ function openEditor(
         y: maxBaseline,
         text,
         fontSize: avgH,
-        maxWidth: Math.max(avgH * 4, maxX - minX), // wrap within the selected region
+        ...(multiLine ? { maxWidth: Math.max(avgH * 4, maxX - minX) } : {}),
       });
     }
     state.editor.addAnnotations(anns, 'Edit text');

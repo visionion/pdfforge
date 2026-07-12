@@ -9,17 +9,51 @@ function normalizedRotation(page: PDFPageProxy, extra: number): number {
 /**
  * pdf.js cannot run two render tasks concurrently against the same page proxy
  * (getPage returns a cached proxy, so the viewport and the thumbnail sidebar
- * would collide and deadlock). Serialize all render tasks through one chain;
- * with a single pdf.js worker this costs nothing and removes the race.
+ * would collide and deadlock). Serialize all render tasks through one queue.
+ *
+ * The queue is priority-aware: viewport pages ('high') always run before
+ * thumbnails ('low'). Without this, a heavy document enqueues a dozen slow
+ * thumbnail renders ahead of the visible page and the main view stays blank
+ * for tens of seconds.
  */
-let renderChain: Promise<unknown> = Promise.resolve();
-function enqueueRender<T>(task: () => Promise<T>): Promise<T> {
-  const run = renderChain.then(task, task);
-  renderChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
+export type RenderPriority = 'high' | 'low';
+
+interface QueuedRender {
+  task: () => Promise<unknown>;
+  resolve: (v: unknown) => void;
+  reject: (e: unknown) => void;
+}
+
+const renderQueue: { high: QueuedRender[]; low: QueuedRender[] } = { high: [], low: [] };
+let pumping = false;
+
+function enqueueRender<T>(task: () => Promise<T>, priority: RenderPriority = 'high'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    renderQueue[priority].push({
+      task: task as () => Promise<unknown>,
+      resolve: resolve as (v: unknown) => void,
+      reject,
+    });
+    void pump();
+  });
+}
+
+async function pump(): Promise<void> {
+  if (pumping) return;
+  pumping = true;
+  try {
+    for (;;) {
+      const next = renderQueue.high.shift() ?? renderQueue.low.shift();
+      if (!next) break;
+      try {
+        next.resolve(await next.task());
+      } catch (e) {
+        next.reject(e);
+      }
+    }
+  } finally {
+    pumping = false;
+  }
 }
 
 /**
@@ -35,6 +69,7 @@ export async function renderPageToCanvas(
   canvas: HTMLCanvasElement,
   scale: number,
   rotation = 0,
+  priority: RenderPriority = 'high',
 ): Promise<void> {
   const viewport = page.getViewport({ scale, rotation: normalizedRotation(page, rotation) });
   const dpr = window.devicePixelRatio || 1;
@@ -52,6 +87,7 @@ export async function renderPageToCanvas(
         viewport,
         transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
       }).promise,
+    priority,
   );
 }
 
@@ -98,7 +134,10 @@ export async function buildTextLayer(
   container.appendChild(frag);
 }
 
-/** Render a small thumbnail canvas for a page, sized to a target width. */
+/**
+ * Render a small thumbnail canvas for a page, sized to a target width.
+ * Runs at low priority so visible viewport pages always paint first.
+ */
 export async function renderThumbnail(
   page: PDFPageProxy,
   targetWidth: number,
@@ -107,7 +146,7 @@ export async function renderThumbnail(
   const base = page.getViewport({ scale: 1, rotation: normalizedRotation(page, rotation) });
   const scale = targetWidth / base.width;
   const canvas = document.createElement('canvas');
-  await renderPageToCanvas(page, canvas, scale, rotation);
+  await renderPageToCanvas(page, canvas, scale, rotation, 'low');
   return canvas;
 }
 

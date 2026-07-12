@@ -47,7 +47,15 @@ export function createSidebar(state: AppState, viewport: HTMLElement): HTMLEleme
       const item = buildThumb(i);
       item.dataset.idx = String(i);
       list.appendChild(item);
-      observer.observe(item);
+      // Eagerly paint thumbnails near the current scroll position; the observer
+      // only handles ones scrolled into view later (IO delivery can be deferred
+      // in background tabs and must never gate first paint).
+      if (item.offsetTop < root.scrollTop + root.clientHeight + 400) {
+        item.dataset.rendered = '1';
+        void paintThumb(state, model[i], item, token, () => renderToken);
+      } else {
+        observer.observe(item);
+      }
     }
     highlight(state.currentPage.get());
   }
